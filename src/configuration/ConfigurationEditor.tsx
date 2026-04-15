@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useState } from 'react';
+import React, { type SyntheticEvent, useState } from 'react';
 
 import {
   type DataSourcePluginOptionsEditorProps,
