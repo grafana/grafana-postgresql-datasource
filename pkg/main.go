@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	logger := backend.NewLoggerWith()
+	logger := backend.NewLoggerWith("logger", "tsdb.postgres")
 	if err := datasource.Manage("grafana-postgresql-datasource", postgres.NewInstanceSettings(logger), datasource.ManageOpts{}); err != nil {
 		log.DefaultLogger.Error(err.Error())
 		os.Exit(1)
