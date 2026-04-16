@@ -10,9 +10,11 @@ test.describe('Config editor', () => {
       async ({ createDataSourceConfigPage, page }) => {
         await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-        await expect(page.getByLabel('Host URL')).toBeVisible();
-        await expect(page.getByLabel('Database name')).toBeVisible();
-        await expect(page.getByLabel('Username')).toBeVisible();
+        // @grafana/ui <Field> doesn't associate labels via for/id unless the child
+        // has an explicit id prop — getByLabel() returns nothing. Use placeholders instead.
+        await expect(page.getByPlaceholder('localhost:5432')).toBeVisible();
+        await expect(page.getByPlaceholder('Database')).toBeVisible();
+        await expect(page.getByPlaceholder('Username')).toBeVisible();
       }
     );
   });
@@ -21,7 +23,7 @@ test.describe('Config editor', () => {
     test('should pass health check when mocked as successful', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-      await page.getByLabel('Host URL').fill('localhost:5432');
+      await page.getByPlaceholder('localhost:5432').fill('localhost:5432');
       await configPage.mockHealthCheckResponse({ status: 'OK' }, 200);
 
       await expect(configPage.saveAndTest()).toBeOK();
@@ -31,7 +33,7 @@ test.describe('Config editor', () => {
     test('should fail health check when host is unreachable', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-      await page.getByLabel('Host URL').fill('localhost:19432');
+      await page.getByPlaceholder('localhost:5432').fill('localhost:19432');
 
       await configPage.saveAndTest();
       await expect(configPage).toHaveAlert('error');

@@ -36,7 +36,8 @@ test.describe('Query editor', () => {
 
     await row.getByRole('radio', { name: 'Code' }).click();
 
-    // In Code mode the raw SQL editor (a CodeMirror instance) should be present
-    await expect(row.locator('.cm-editor')).toBeVisible();
+    // The SQL raw editor uses @grafana/plugin-ui SQLEditor → @grafana/ui CodeEditor → Monaco.
+    // Monaco renders a .monaco-editor container (not CodeMirror's .cm-editor).
+    await expect(row.locator('.monaco-editor')).toBeVisible();
   });
 });
