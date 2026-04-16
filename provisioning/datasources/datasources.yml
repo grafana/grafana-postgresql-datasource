@@ -9,8 +9,11 @@ datasources:
     orgId: 1
     version: 1
     editable: true
+    url: "${DS_INSTANCE_HOST}:${DS_INSTANCE_PORT}"
+    user: "${DS_INSTANCE_USERNAME}"
     jsonData:
+      database: "${DS_INSTANCE_DATABASE}"
       sslmode: disable
       postgresVersion: 1500
     secureJsonData:
-      password: ''
+      password: "${DS_INSTANCE_PASSWORD}"
