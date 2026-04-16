@@ -1,14 +1,16 @@
 apiVersion: 1
 
 datasources:
-  - name: 'postgresql'
-    type: 'grafana-postgresql-datasource'
+  - name: postgresql
+    type: grafana-postgresql-datasource
+    uid: postgresql-e2e
     access: proxy
     isDefault: false
     orgId: 1
     version: 1
     editable: true
     jsonData:
-      path: '/resources'
+      sslmode: disable
+      postgresVersion: 1500
     secureJsonData:
-      apiKey: 'api-key'
+      password: ''

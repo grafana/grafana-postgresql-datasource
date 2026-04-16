@@ -1,28 +1,42 @@
-import { test, expect } from '@grafana/plugin-e2e';
+import { expect, test } from '@grafana/plugin-e2e';
+import { type Locator, type Page } from '@playwright/test';
 
-test('smoke: should render query editor', async ({ panelEditPage, readProvisionedDataSource }) => {
-  const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await panelEditPage.datasource.set(ds.name);
-  await expect(panelEditPage.getQueryEditorRow('A').getByRole('textbox', { name: 'Query Text' })).toBeVisible();
-});
+// Grafana 13 migrated query editor row selectors from aria-label to data-testid
+// (grafana/grafana#121784). This helper matches both so tests work across versions.
+function getQueryEditorRow(page: Page, refId: string): Locator {
+  return page
+    .locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]')
+    .filter({
+      has: page.locator(
+        `[data-testid="data-testid Query editor row title ${refId}"], [aria-label="Query editor row title ${refId}"]`
+      ),
+    });
+}
 
-test('should trigger new query when Constant field is changed', async ({
-  panelEditPage,
-  readProvisionedDataSource,
-}) => {
-  const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await panelEditPage.datasource.set(ds.name);
-  await panelEditPage.getQueryEditorRow('A').getByRole('textbox', { name: 'Query Text' }).fill('test query');
-  const queryReq = panelEditPage.waitForQueryDataRequest();
-  await panelEditPage.getQueryEditorRow('A').getByRole('spinbutton').fill('10');
-  await expect(await queryReq).toBeTruthy();
-});
+test.describe('Query editor', () => {
+  test.beforeEach(async ({ panelEditPage, readProvisionedDataSource }) => {
+    const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
+    await panelEditPage.datasource.set(ds.name);
+  });
 
-test('data query should return values 10 and 20', async ({ panelEditPage, readProvisionedDataSource }) => {
-  const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await panelEditPage.datasource.set(ds.name);
-  await panelEditPage.getQueryEditorRow('A').getByRole('textbox', { name: 'Query Text' }).fill('test query');
-  await panelEditPage.setVisualization('Table');
-  await expect(panelEditPage.refreshPanel()).toBeOK();
-  await expect(panelEditPage.panel.data).toContainText(['10', '20']);
+  test(
+    'smoke: should render query editor',
+    { tag: '@plugins' },
+    async ({ page }) => {
+      const row = getQueryEditorRow(page, 'A');
+
+      // @grafana/sql renders Builder / Code mode toggle in the query header
+      await expect(row.getByRole('radio', { name: 'Builder' })).toBeVisible();
+      await expect(row.getByRole('radio', { name: 'Code' })).toBeVisible();
+    }
+  );
+
+  test('should switch to Code mode', async ({ page }) => {
+    const row = getQueryEditorRow(page, 'A');
+
+    await row.getByRole('radio', { name: 'Code' }).click();
+
+    // In Code mode the raw SQL editor (a CodeMirror instance) should be present
+    await expect(row.locator('.cm-editor')).toBeVisible();
+  });
 });

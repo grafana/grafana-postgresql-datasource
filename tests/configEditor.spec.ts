@@ -1,31 +1,40 @@
-import { test, expect } from '@grafana/plugin-e2e';
-import { MyDataSourceOptions, MySecureJsonData } from '../src/types';
+import { expect, test } from '@grafana/plugin-e2e';
 
-test('smoke: should render config editor', async ({ createDataSourceConfigPage, readProvisionedDataSource, page }) => {
-  const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await createDataSourceConfigPage({ type: ds.type });
-  await expect(page.getByLabel('Path')).toBeVisible();
-});
-test('"Save & test" should be successful when configuration is valid', async ({
-  createDataSourceConfigPage,
-  readProvisionedDataSource,
-  page,
-}) => {
-  const ds = await readProvisionedDataSource<MyDataSourceOptions, MySecureJsonData>({ fileName: 'datasources.yml' });
-  const configPage = await createDataSourceConfigPage({ type: ds.type });
-  await page.getByRole('textbox', { name: 'Path' }).fill(ds.jsonData.path ?? '');
-  await page.getByRole('textbox', { name: 'API Key' }).fill(ds.secureJsonData?.apiKey ?? '');
-  await expect(configPage.saveAndTest()).toBeOK();
-});
+const PLUGIN_TYPE = 'grafana-postgresql-datasource';
 
-test('"Save & test" should fail when configuration is invalid', async ({
-  createDataSourceConfigPage,
-  readProvisionedDataSource,
-  page,
-}) => {
-  const ds = await readProvisionedDataSource<MyDataSourceOptions, MySecureJsonData>({ fileName: 'datasources.yml' });
-  const configPage = await createDataSourceConfigPage({ type: ds.type });
-  await page.getByRole('textbox', { name: 'Path' }).fill(ds.jsonData.path ?? '');
-  await expect(configPage.saveAndTest()).not.toBeOK();
-  await expect(configPage).toHaveAlert('error', { hasText: 'API key is missing' });
+test.describe('Config editor', () => {
+  test.describe('rendering', () => {
+    test(
+      'smoke: should render config editor',
+      { tag: '@plugins' },
+      async ({ createDataSourceConfigPage, page }) => {
+        await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+        await expect(page.getByLabel('Host URL')).toBeVisible();
+        await expect(page.getByLabel('Database name')).toBeVisible();
+        await expect(page.getByLabel('Username')).toBeVisible();
+      }
+    );
+  });
+
+  test.describe('save & test', () => {
+    test('should pass health check when mocked as successful', async ({ createDataSourceConfigPage, page }) => {
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      await page.getByLabel('Host URL').fill('localhost:5432');
+      await configPage.mockHealthCheckResponse({ status: 'OK' }, 200);
+
+      await expect(configPage.saveAndTest()).toBeOK();
+      await expect(configPage).toHaveAlert('success');
+    });
+
+    test('should fail health check when host is unreachable', async ({ createDataSourceConfigPage, page }) => {
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      await page.getByLabel('Host URL').fill('localhost:19432');
+
+      await configPage.saveAndTest();
+      await expect(configPage).toHaveAlert('error');
+    });
+  });
 });

@@ -3,3 +3,10 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    environment:
+      # Grafana 13 enabled splashScreen by default; it renders as an overlay that
+      # blocks all Playwright interactions. Suppress it unconditionally.
+      GF_FEATURE_TOGGLES_splashScreen: "false"
+      # Grafana 13 dashboardNewLayouts changes panel edit page structure and
+      # can break query editor selectors. Suppress pending upstream plugin-tools fix.
+      GF_FEATURE_TOGGLES_dashboardNewLayouts: "false"
