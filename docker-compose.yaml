@@ -35,9 +35,6 @@ services:
       # Grafana 13 enabled splashScreen by default; it renders as an overlay that
       # blocks all Playwright interactions. Suppress it unconditionally.
       GF_FEATURE_TOGGLES_splashScreen: "false"
-      # Grafana 13 dashboardNewLayouts changes panel edit page structure and
-      # can break query editor selectors. Suppress pending upstream plugin-tools fix.
-      GF_FEATURE_TOGGLES_dashboardNewLayouts: "false"
       # Provisioning env vars — override at runtime for Cloud E2E (DS_INSTANCE_* from Vault).
       DS_INSTANCE_HOST: postgres
       DS_INSTANCE_PORT: "5432"

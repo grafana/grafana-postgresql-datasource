@@ -32,52 +32,50 @@ function exploreUrl(
 }
 
 test.describe('Query editor', () => {
-  test.beforeEach(async ({ panelEditPage, readProvisionedDataSource }) => {
+  // Navigate via exploreUrl so the datasource is encoded in the URL and the query
+  // editor renders on page load — no panelEditPage dashboard flow needed.
+  test.beforeEach(async ({ readProvisionedDataSource, page }) => {
     const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-    await panelEditPage.datasource.set(ds.name);
+    await page.goto(exploreUrl(ds.uid));
   });
 
   test.describe('rendering', () => {
     test(
       'smoke: should render Builder and Code mode options',
       { tag: '@plugins' },
-      async ({ panelEditPage }) => {
-        const row = panelEditPage.getQueryEditorRow('A');
-        await expect(row.getByRole('radio', { name: 'Builder' })).toBeVisible();
-        await expect(row.getByRole('radio', { name: 'Code' })).toBeVisible();
+      async ({ page }) => {
+        await expect(page.getByRole('radio', { name: 'Builder' })).toBeVisible();
+        await expect(page.getByRole('radio', { name: 'Code' })).toBeVisible();
       }
     );
   });
 
   test.describe('Builder mode', () => {
-    test('should activate Builder mode and show visual query builder', async ({ panelEditPage }) => {
-      const row = panelEditPage.getQueryEditorRow('A');
-      await row.getByRole('radio', { name: 'Builder' }).click();
-      await expect(row.getByRole('radio', { name: 'Builder' })).toBeChecked();
+    test('should activate Builder mode and show visual query builder', async ({ page }) => {
+      await page.getByRole('radio', { name: 'Builder' }).click();
+      await expect(page.getByRole('radio', { name: 'Builder' })).toBeChecked();
 
       // @grafana/sql Builder mode shows a Table combobox for selecting a table.
-      await expect(row.getByRole('combobox', { name: 'Table' })).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Table' })).toBeVisible();
     });
   });
 
   test.describe('Code mode', () => {
-    test('should activate Code mode and show Monaco SQL editor', async ({ panelEditPage }) => {
-      const row = panelEditPage.getQueryEditorRow('A');
-      await row.getByRole('radio', { name: 'Code' }).click();
-      await expect(row.getByRole('radio', { name: 'Code' })).toBeChecked();
+    test('should activate Code mode and show Monaco SQL editor', async ({ page }) => {
+      await page.getByRole('radio', { name: 'Code' }).click();
+      await expect(page.getByRole('radio', { name: 'Code' })).toBeChecked();
 
       // @grafana/sql uses @grafana/plugin-ui SQLEditor → Monaco (not CodeMirror).
       // Use [role="code"] to scope away from the rename-box widget that also has
       // class="monaco-editor" in the DOM.
-      await expect(row.locator('[role="code"]')).toBeVisible();
+      await expect(page.locator('[role="code"]')).toBeVisible();
     });
 
-    test('should accept a raw SQL query in Code mode', async ({ panelEditPage, page }) => {
-      const row = panelEditPage.getQueryEditorRow('A');
-      await row.getByRole('radio', { name: 'Code' }).click();
-      await expect(row.getByRole('radio', { name: 'Code' })).toBeChecked();
+    test('should accept a raw SQL query in Code mode', async ({ page }) => {
+      await page.getByRole('radio', { name: 'Code' }).click();
+      await expect(page.getByRole('radio', { name: 'Code' })).toBeChecked();
 
-      const editor = row.locator('[role="code"]');
+      const editor = page.locator('[role="code"]');
       await editor.click();
       await page.keyboard.press('ControlOrMeta+a');
       await page.keyboard.type('SELECT * FROM metrics ORDER BY time LIMIT 5');
