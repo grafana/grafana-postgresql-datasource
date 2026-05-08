@@ -53,6 +53,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "prettier": "^3.6.0",
+    "react-select-event": "5.5.1",
     "replace-in-file-webpack-plugin": "^1.0.0",
     "sass": "^1.89.0",
     "sass-loader": "^16.0.0",
@@ -88,8 +89,5 @@
     "tslib": "^2.8.0",
     "uuid": "^11.1.0"
   },
-  "packageManager": "npm@11.4.2",
-  "overrides": {
-    "ajv": "^8.0.0"
-  }
+  "packageManager": "npm@11.4.2"
 }

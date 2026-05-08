@@ -1,0 +1,17 @@
+name: Scheduled Cloud end-to-end tests
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  playwright-cloud:
+    uses: grafana/data-sources/.github/workflows/playwright-cloud.yml@main
+    secrets: inherit
+    with:
+      repo-secrets: |
+        DS_INSTANCE_HOST=grafana-postgresql-datasource/instance:host
+        DS_INSTANCE_PASSWORD=grafana-postgresql-datasource/instance:password
+        DS_INSTANCE_PORT=grafana-postgresql-datasource/instance:port
+        DS_INSTANCE_USERNAME=grafana-postgresql-datasource/instance:username
