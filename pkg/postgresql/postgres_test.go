@@ -1,4 +1,4 @@
-package postgres
+package postgresql
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana-postgresql-datasource/pkg/postgres/sqleng"
+	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
 // Test generateConnectionString.

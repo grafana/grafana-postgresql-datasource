@@ -1,4 +1,4 @@
-package postgres
+package postgresql
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/gtime"
 
-	"github.com/grafana/grafana-postgresql-datasource/pkg/postgres/sqleng"
+	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
 const rsIdentifier = `([_a-zA-Z0-9]+)`

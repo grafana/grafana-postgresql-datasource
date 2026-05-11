@@ -1,4 +1,4 @@
-package postgres
+package postgresql
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-postgresql-datasource/pkg/postgres/sqleng"
+	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

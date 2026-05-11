@@ -1,4 +1,4 @@
-package postgres
+package postgresql
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/experimental"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana-postgresql-datasource/pkg/postgres/sqleng"
+	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
 var updateGoldenFiles = false
