@@ -3,3 +3,24 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: 'grafana-postgresql-datasource-db'
+    environment:
+      POSTGRES_USER: grafana
+      POSTGRES_PASSWORD: grafana
+      POSTGRES_DB: grafana
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./tests/e2e/fixtures/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U grafana -d grafana']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
