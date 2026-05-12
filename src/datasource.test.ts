@@ -519,7 +519,7 @@ describe('PostgreSQLDatasource', () => {
       const { ds } = setupTestContext(response, undefined, templateSrv);
       const results = await ds.metricFindQuery(query, { range: defaultRange, searchFilter: 'aTit' });
 
-      expect(fetchMock).toBeCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0].data.queries[0].rawSql).toBe(
         "select title from atable where title LIKE 'aTit%'"
       );
@@ -574,7 +574,7 @@ describe('PostgreSQLDatasource', () => {
       const { ds } = setupTestContext(response, undefined, templateSrv);
       const results = await ds.metricFindQuery(query, { range: defaultRange });
 
-      expect(fetchMock).toBeCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0].data.queries[0].rawSql).toBe("select title from atable where title LIKE '%'");
       expect(results).toEqual([
         { text: 'aTitle' },

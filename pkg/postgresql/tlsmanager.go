@@ -1,11 +1,11 @@
-package postgres
+package postgresql
 
 import (
 	"fmt"
 	"os"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-postgresql-datasource/pkg/postgres/sqleng"
+	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
 var validateCertFunc = validateCertFilePaths
