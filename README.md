@@ -1,7 +1,7 @@
 # PostgreSQL data source for Grafana
 
 > **Note**: This core plugin was extracted from the [grafana/grafana](https://github.com/grafana/grafana) repository
-> and is now bundled with Grafana.
+> and will be bundled with Grafana once it is removed from there.
 
 ## Overview
 
