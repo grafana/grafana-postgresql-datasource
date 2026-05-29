@@ -40,5 +40,9 @@
     "test": "jest --watch --onlyChanged",
     "test:ci": "jest --maxWorkers 4"
   },
-  "packageManager": "yarn@4.15.0"
+  "packageManager": "yarn@4.15.0",
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11.15.0"
+  }
 }
