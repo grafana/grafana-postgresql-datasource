@@ -2,17 +2,26 @@
   "type": "datasource",
   "name": "PostgreSQL",
   "id": "grafana-postgresql-datasource",
-  "executable": "gpx_grafana_postgresql_datasource",
-  "aliasIDs": ["postgres"],
+  "aliasIDs": [
+    "postgres"
+  ],
   "category": "sql",
-
+  "executable": "gpx_grafana_postgresql_datasource",
+  "alerting": true,
+  "annotations": true,
+  "metrics": true,
+  "logs": true,
+  "backend": true,
+  "queryOptions": {
+    "minInterval": true
+  },
   "info": {
     "description": "Data source for PostgreSQL and compatible databases",
     "keywords": [
-        "postgresql",
-        "postgres",
-        "sql",
-        "database"
+      "postgresql",
+      "postgres",
+      "sql",
+      "database"
     ],
     "author": {
       "name": "Grafana Labs",
@@ -25,22 +34,18 @@
     "version": "%VERSION%",
     "updated": "%TODAY%",
     "links": [
-      { "name": "Raise issue", "url": "https://github.com/grafana/grafana-postgresql-datasource/issues/new" },
-      { "name": "Documentation", "url": "https://grafana.com/docs/grafana/latest/datasources/postgres/" }
+      {
+        "name": "Raise issue",
+        "url": "https://github.com/grafana/grafana-postgresql-datasource/issues/new"
+      },
+      {
+        "name": "Documentation",
+        "url": "https://grafana.com/docs/plugins/grafana-postgresql-datasource/latest"
+      }
     ]
   },
   "dependencies": {
     "grafanaDependency": ">=12.3.0",
     "plugins": []
-  },
-
-  "alerting": true,
-  "annotations": true,
-  "metrics": true,
-  "logs": true,
-  "backend": true,
-
-  "queryOptions": {
-    "minInterval": true
   }
 }

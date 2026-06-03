@@ -12,6 +12,7 @@
     "lint:fix": "npm run lint -- --fix && prettier --write --list-different .",
     "e2e": "playwright test",
     "server": "docker compose up --build",
+    "docs": "cd docs && make docs",
     "sign": "sign-plugin"
   },
   "author": "Grafana",
