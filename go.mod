@@ -1,10 +1,10 @@
 module github.com/grafana/grafana-postgresql-datasource
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/grafana/grafana-plugin-sdk-go v0.292.1
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.55.0
 )

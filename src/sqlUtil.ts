@@ -1,5 +1,3 @@
-import { isEmpty } from 'lodash';
-
 import { createSelectClause, haveColumns, type RAQBFieldTypes, type SQLQuery } from '@grafana/sql';
 
 export function getFieldConfig(type: string): { raqbFieldType: RAQBFieldTypes; icon: string } {
@@ -64,7 +62,7 @@ export function toRawSql({ sql, table }: SQLQuery): string {
   }
 
   if (sql.groupBy?.[0]?.property.name) {
-    const groupBy = sql.groupBy.map((g) => g.property.name).filter((g) => !isEmpty(g));
+    const groupBy = sql.groupBy.map((g) => g.property.name).filter((g) => g != null && g !== '');
     rawQuery += `GROUP BY ${groupBy.join(', ')} `;
   }
 
