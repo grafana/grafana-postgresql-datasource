@@ -28,6 +28,6 @@ jobs:
       id-token: write
       pull-requests: read
     with:
-      go-version: "1.25.7"
-      # TODO: verify golangci-lint-version compatible with Go 1.25
+      # Matches the go directive in go.mod; picks up stdlib security fixes (GO-2026-5037/5039).
+      go-version: "1.26.4"
       golangci-lint-version: "2.10.1"
