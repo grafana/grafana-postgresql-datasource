@@ -28,6 +28,13 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    configs:
+      # Run the externalized plugin in place of the core PostgreSQL plugin.
+      # Without as_external=true, DuplicatePluginIDValidation (pkg/services/pluginsintegration/pipeline/steps.go)
+      # drops the external plugin because the core one is already registered under
+      # id=grafana-postgresql-datasource, so CI would silently test core instead.
+      - source: grafana_custom_ini
+        target: /etc/grafana/grafana.ini
     depends_on:
       fixture-loader:
         condition: service_completed_successfully
@@ -41,3 +48,9 @@ services:
       DS_INSTANCE_USERNAME: grafana
       DS_INSTANCE_DATABASE: testdb
       DS_INSTANCE_PASSWORD: grafana
+
+configs:
+  grafana_custom_ini:
+    content: |
+      [plugin.grafana-postgresql-datasource]
+      as_external = true
