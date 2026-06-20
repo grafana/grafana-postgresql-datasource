@@ -1,0 +1,148 @@
+{
+  "targetApiVersion": "v0alpha1",
+  "settings": {
+    "spec": {
+      "type": "object",
+      "required": [
+        "url",
+        "user"
+      ],
+      "properties": {
+        "jsonData": {
+          "type": "object",
+          "properties": {
+            "allowCleartextPasswords": {
+              "description": "Allows using the cleartext client side plugin if required by an account.",
+              "type": "boolean"
+            },
+            "authenticationType": {
+              "description": "The authentication method used to connect to the database.",
+              "type": "string"
+            },
+            "connMaxLifetime": {
+              "description": "Maximum lifetime of a connection in seconds. Default is 14400 (4 hours). Set to 0 to reuse connections forever.",
+              "type": "number",
+              "default": 14400,
+              "minimum": 0
+            },
+            "connectionTimeout": {
+              "description": "The number of seconds to wait before aborting attempts to connect to the database.",
+              "type": "number",
+              "minimum": 0
+            },
+            "database": {
+              "description": "PostgreSQL database name.",
+              "type": "string"
+            },
+            "enableSecureSocksProxy": {
+              "description": "Enables proxying the datasource connection through the secure socks proxy.",
+              "type": "boolean"
+            },
+            "encrypt": {
+              "description": "Determines whether or how the connection to the server is encrypted.",
+              "type": "string"
+            },
+            "maxIdleConns": {
+              "description": "Maximum number of idle connections in the connection pool.",
+              "type": "number",
+              "minimum": 0
+            },
+            "maxOpenConns": {
+              "description": "Maximum number of open connections to the database. Default is 100.",
+              "type": "number",
+              "default": 100,
+              "minimum": 0
+            },
+            "secureSocksProxyUsername": {
+              "description": "Username used to authenticate with the secure socks proxy.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData.enableSecureSocksProxy == true"
+            },
+            "servername": {
+              "description": "Server name used to verify the hostname on the returned TLS certificate.",
+              "type": "string"
+            },
+            "sslCertFile": {
+              "description": "Path to the client certificate file for TLS/SSL client authentication.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData.sslmode != 'disable' \u0026\u0026 jsonData.tlsConfigurationMethod != 'file-content'"
+            },
+            "sslKeyFile": {
+              "description": "Path to the client key file for TLS/SSL client authentication.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData.sslmode != 'disable' \u0026\u0026 jsonData.tlsConfigurationMethod != 'file-content'"
+            },
+            "sslRootCertFile": {
+              "description": "Path to the root certificate file. Required if TLS/SSL mode is verify-ca or verify-full.",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData.sslmode != 'disable' \u0026\u0026 jsonData.tlsConfigurationMethod != 'file-content'"
+            },
+            "sslmode": {
+              "description": "Determines whether or with what priority a secure TLS/SSL TCP/IP connection will be negotiated with the server.",
+              "type": "string",
+              "default": "require",
+              "enum": [
+                "disable",
+                "require",
+                "verify-ca",
+                "verify-full"
+              ]
+            },
+            "timeInterval": {
+              "description": "A lower limit for the auto group by time interval. Recommended to be set to write frequency, for example 1m if your data is written every minute.",
+              "type": "string"
+            },
+            "timescaledb": {
+              "description": "TimescaleDB is a time-series database built as a PostgreSQL extension. If enabled, Grafana will use time_bucket in the $__timeGroup macro and display TimescaleDB specific aggregate functions in the query builder.",
+              "type": "boolean"
+            },
+            "timezone": {
+              "description": "Specify the timezone used in the database session, such as Europe/Berlin or +02:00.",
+              "type": "string"
+            },
+            "tlsConfigurationMethod": {
+              "description": "How TLS/SSL certificates are configured. File system path specifies paths to certificates on the local file system. Certificate content stores certificate data encrypted in Grafana's database.",
+              "type": "string",
+              "default": "file-path",
+              "enum": [
+                "file-path",
+                "file-content"
+              ],
+              "x-dsconfig-depends-on": "jsonData.sslmode != 'disable'"
+            },
+            "tlsSkipVerify": {
+              "description": "When enabled, skips verification of the PostgreSQL server's TLS certificate chain and host name.",
+              "type": "boolean"
+            }
+          }
+        },
+        "url": {
+          "description": "PostgreSQL host and port.",
+          "type": "string"
+        },
+        "user": {
+          "description": "Database username.",
+          "type": "string"
+        }
+      }
+    },
+    "secureValues": [
+      {
+        "key": "password",
+        "description": "Database password."
+      },
+      {
+        "key": "tlsClientCert",
+        "description": "PEM-encoded client certificate content."
+      },
+      {
+        "key": "tlsCACert",
+        "description": "PEM-encoded root CA certificate content. Required for verify-ca and verify-full modes."
+      },
+      {
+        "key": "tlsClientKey",
+        "description": "PEM-encoded client private key content."
+      }
+    ]
+  }
+}

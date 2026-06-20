@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.1
+
+- Chore: Added plugin schema and artifacts
+
 ## 13.0.0
 
 Initial public release as external plugin.
