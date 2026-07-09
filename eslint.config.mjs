@@ -1,7 +1,6 @@
-import { defineConfig } from 'eslint/config';
 import baseConfig from './.config/eslint.config.mjs';
 
-export default defineConfig([
+export default [
   {
     ignores: [
       '**/logs',
@@ -45,4 +44,4 @@ export default defineConfig([
       'react-hooks/refs': 'off',
     },
   },
-]);
+];
