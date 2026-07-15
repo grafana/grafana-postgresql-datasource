@@ -10,14 +10,14 @@ jobs:
       id-token: write
     steps:
       - name: Checkout Actions
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: 'grafana/grafana-github-actions'
           path: ./actions
           ref: main
           persist-credentials: false
       - id: get-github-token
-        uses: grafana/shared-workflows/actions/create-github-app-token@create-github-app-token/v0.3.1
+        uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
         with:
           github_app: grafana-oss-big-tent
       - name: Install Actions
