@@ -21,8 +21,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/grafana/grafana/pkg/tsdb/sqlmacro"
 )
 
 // MetaKeyExecutedQueryString is the key where the executed query should get stored
@@ -232,7 +230,7 @@ func (e *DataSourceHandler) executeQuery(queryContext context.Context, query bac
 	// so split it off before interpolation and re-append it afterwards. This
 	// keeps it out of comment stripping and macro substitution, and prevents a
 	// macro from completing across the comment boundary in either direction.
-	rawSQL, sqlCommenterTag := sqlmacro.SplitTrailingSQLCommenter(queryJSON.RawSql, "--")
+	rawSQL, sqlCommenterTag := SplitTrailingSQLCommenter(queryJSON.RawSql, "--")
 
 	// global substitutions
 	interpolatedQuery := Interpolate(query, query.TimeRange, e.dsInfo.JsonData.TimeInterval, rawSQL)

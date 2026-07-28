@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -9,8 +10,10 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/gtime"
 
 	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
-	"github.com/grafana/grafana/pkg/tsdb/sqlmacro"
 )
+
+// macroRegExp matches a complete Grafana macro call of the form $name(...).
+var macroRegExp = regexp.MustCompile(`\$([_a-zA-Z0-9]+)\(([^\)]*)\)`)
 
 // isDollarTagChar reports whether b is valid inside a PostgreSQL dollar-quote tag
 // (letters and digits only; underscore is also allowed per identifier rules).
@@ -144,7 +147,7 @@ func (m *postgresMacroEngine) Interpolate(query *backend.DataQuery, timeRange ba
 
 	var macroError error
 
-	sql = m.ReplaceAllStringSubmatchFunc(sqlmacro.RegExp, sql, func(groups []string) string {
+	sql = m.ReplaceAllStringSubmatchFunc(macroRegExp, sql, func(groups []string) string {
 		// detect if $__timeGroup is supposed to add AS time for pre 5.3 compatibility
 		// if there is a ',' directly after the macro call $__timeGroup is probably used
 		// in the old way. Inside window function ORDER BY $__timeGroup will be followed
