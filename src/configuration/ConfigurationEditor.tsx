@@ -49,6 +49,9 @@ export const postgresVersions: Array<ComboboxOption<number>> = [
   { label: '13', value: 1300 },
   { label: '14', value: 1400 },
   { label: '15', value: 1500 },
+  { label: '16', value: 1600 },
+  { label: '17', value: 1700 },
+  { label: '18', value: 1800 },
 ];
 
 export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<PostgresOptions, SecureJsonData>) => {
