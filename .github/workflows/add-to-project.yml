@@ -9,6 +9,9 @@ on:
 
 jobs:
   add-to-project:
+    # Fork PRs get a read-only GITHUB_TOKEN and cannot be granted `id-token: write`,
+    # so minting the GitHub App token via OIDC always fails. Skip them.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       id-token: write
