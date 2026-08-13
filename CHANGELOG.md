@@ -4,6 +4,7 @@
 
 - Clear CVEs due in the current SLO window across frontend dependencies ([#169](https://github.com/grafana/grafana-postgresql-datasource/pull/169))
 - Add secure socks proxy (PDC) end to end coverage ([#159](https://github.com/grafana/grafana-postgresql-datasource/pull/159))
+- Fixes CVE-2026-19475 ([#168](https://github.com/grafana/grafana-postgresql-datasource/pull/168))
 
 ## 13.0.2
 
