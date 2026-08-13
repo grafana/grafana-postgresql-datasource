@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.3
+
+- Security fixes
+
 ## 13.0.2
 
 - Bump go v1.26.7 and grafana-plugin-sdk-go v0.296.4 ([#119](https://github.com/grafana/grafana-postgresql-datasource/pull/119))
