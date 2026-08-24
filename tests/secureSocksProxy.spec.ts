@@ -5,6 +5,10 @@ import { type PostgresOptions } from '../src/types';
 const PLUGIN_TYPE = 'grafana-postgresql-datasource';
 const PROXIED_DS_NAME = 'postgresql-socks-proxy';
 
+// GRAFANA_URL is set only by the Cloud cron workflow (see .github/workflows/cron.yml).
+// The `postgresql-socks-proxy` provisioned datasource these tests read is a local-only fixture.
+const isCloudRun = !!process.env.GRAFANA_URL;
+
 // Fixture data time range — must match tests/e2e/fixtures/schema.sql (seed 42).
 const FIXTURE_FROM_ISO = '2026-03-17T21:00:00.000Z';
 const FIXTURE_TO_ISO = '2026-03-18T01:00:00.000Z';
@@ -29,6 +33,13 @@ function exploreUrl(datasourceUID: string, rawSql: string): string {
 }
 
 test.describe('Secure socks proxy', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Depends on the `postgresql-socks-proxy` local provisioned datasource, which is not available on Cloud.'
+    );
+  });
+
   test.describe('config editor', () => {
     test(
       'should render Secure Socks Proxy section',
