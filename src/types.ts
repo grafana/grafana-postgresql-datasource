@@ -20,6 +20,7 @@ export interface PostgresOptions extends SQLOptions {
   postgresVersion?: number;
   timescaledb?: boolean;
   enableSecureSocksProxy?: boolean;
+  enableMultiDatabase?: boolean;
 }
 
 export interface SecureJsonData {
