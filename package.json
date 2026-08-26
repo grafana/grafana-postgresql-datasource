@@ -1,6 +1,6 @@
 {
   "name": "grafana-postgresql-datasource",
-  "version": "13.0.1",
+  "version": "13.0.2",
   "description": "PostgreSQL datasource for Grafana",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
