@@ -24,6 +24,15 @@ services:
       - "set -e; PGPASSWORD=grafana psql postgresql://grafana@postgres/testdb -f /fixtures/schema.sql"
     restart: no
 
+  # Local stand-in for a PDC-style secure socks proxy: a plain, unauthenticated SOCKS5
+  # relay with no ACL, so any destination the Grafana backend dials (including `postgres`)
+  # is reachable through it. Exercises the same GF_SECURE_SOCKS_DATASOURCE_PROXY_* dialer
+  # path as real PDC without requiring PDC's mTLS/cert infrastructure locally.
+  microsocks:
+    image: serjs/go-socks5-proxy@sha256:0af522996f402c03ecd985a87997158eabeb28935365e3a384df37eafcf740ea
+    environment:
+      REQUIRE_AUTH: "false"
+
   grafana:
     extends:
       file: .config/docker-compose-base.yaml
@@ -31,6 +40,8 @@ services:
     depends_on:
       fixture-loader:
         condition: service_completed_successfully
+      microsocks:
+        condition: service_started
     environment:
       # Grafana 13 enabled splashScreen by default; it renders as an overlay that
       # blocks all Playwright interactions. Suppress it unconditionally.
@@ -41,3 +52,7 @@ services:
       DS_INSTANCE_USERNAME: grafana
       DS_INSTANCE_DATABASE: testdb
       DS_INSTANCE_PASSWORD: grafana
+      # Secure socks proxy (PDC) — allow_insecure since microsocks has no TLS/mTLS.
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_ENABLED: "true"
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_PROXY_ADDRESS: microsocks:1080
+      GF_SECURE_SOCKS_DATASOURCE_PROXY_ALLOW_INSECURE: "true"
