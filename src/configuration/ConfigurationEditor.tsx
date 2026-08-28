@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useState } from 'react';
+import { type SyntheticEvent, useEffect, useState } from 'react';
 
 import {
   type DataSourcePluginOptionsEditorProps,
@@ -58,6 +58,13 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
   useAutoDetectFeatures({ props, setVersionOptions });
   useMigrateDatabaseFields(props);
 
+  useEffect(() => {
+    if (jsonData.database === undefined) {
+      updateDatasourcePluginJsonDataOption(props, 'database', 'postgres');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { options, onOptionsChange } = props;
   const jsonData = options.jsonData;
 
@@ -93,6 +100,10 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
 
   const onTimeScaleDBChanged = (event: SyntheticEvent<HTMLInputElement>) => {
     updateDatasourcePluginJsonDataOption(props, 'timescaledb', event.currentTarget.checked);
+  };
+
+  const onMultiDatabaseChanged = (event: SyntheticEvent<HTMLInputElement>) => {
+    updateDatasourcePluginJsonDataOption(props, 'enableMultiDatabase', event.currentTarget.checked);
   };
 
   const onDSOptionChanged = (property: keyof PostgresOptions) => {
@@ -137,12 +148,12 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
             />
           </Field>
 
-          <Field label="Database name" required noMargin>
+          <Field label="Default database name" required noMargin>
             <Input
               width={WIDTH_LONG}
               name="database"
-              value={jsonData.database || ''}
-              placeholder="Database"
+              value={jsonData.database ?? ''}
+              placeholder="postgres"
               onChange={onUpdateDatasourceJsonDataOption(props, 'database')}
             />
           </Field>
@@ -425,6 +436,28 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
                 }
               >
                 <Switch value={jsonData.timescaledb || false} onChange={onTimeScaleDBChanged} width={WIDTH_LONG} />
+              </Field>
+              <Field
+                noMargin
+                label={
+                  <Label>
+                    <EditorStack gap={0.5}>
+                      <span>Multi-database queries</span>
+                      <Tooltip
+                        content={
+                          <span>
+                            If enabled, a database selector will appear in the query editor allowing queries to target
+                            databases other than the default configured above.
+                          </span>
+                        }
+                      >
+                        <Icon name="info-circle" size="sm" />
+                      </Tooltip>
+                    </EditorStack>
+                  </Label>
+                }
+              >
+                <Switch value={jsonData.enableMultiDatabase || false} onChange={onMultiDatabaseChanged} width={WIDTH_LONG} />
               </Field>
             </Stack>
           </ConfigSubSection>

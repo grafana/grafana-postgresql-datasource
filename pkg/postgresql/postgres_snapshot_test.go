@@ -165,7 +165,7 @@ func TestIntegrationPostgresSnapshots(t *testing.T) {
 
 			cnnstr := getCnnStr()
 
-			p, handler, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{})
+			p, handler, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{}, nil)
 			require.NoError(t, err)
 
 			t.Cleanup(func() {

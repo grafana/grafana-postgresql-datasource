@@ -21,7 +21,7 @@ import (
 	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
-func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit int64, dsInfo sqleng.DataSourceInfo, cnnstr string, logger log.Logger, settings backend.DataSourceInstanceSettings) (*pgxpool.Pool, *sqleng.DataSourceHandler, error) {
+func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit int64, dsInfo sqleng.DataSourceInfo, cnnstr string, logger log.Logger, settings backend.DataSourceInstanceSettings, poolFactory sqleng.PoolFactory) (*pgxpool.Pool, *sqleng.DataSourceHandler, error) {
 	pgxConf, err := pgxpool.ParseConfig(cnnstr)
 	if err != nil {
 		logger.Error("postgres config creation failed", "error", err)
@@ -66,7 +66,7 @@ func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit in
 	}
 
 	handler, err := sqleng.NewQueryDataHandler(userFacingDefaultError, p, config, &queryResultTransformer, newPostgresMacroEngine(dsInfo.JsonData.Timescaledb),
-		logger)
+		logger, poolFactory)
 	if err != nil {
 		logger.Error("Failed connecting to Postgres", "err", err)
 		return nil, nil, err
@@ -132,7 +132,26 @@ func NewInstanceSettings(logger log.Logger) datasource.InstanceFactoryFunc {
 		if err != nil {
 			return "", err
 		}
-		_, handler, err := newPostgres(ctx, userFacingDefaultError, sqlCfg.RowLimit, dsInfo, cnnstr, pgxlogger, settings)
+
+		poolFactory := func(factoryCtx context.Context, database string) (*pgxpool.Pool, error) {
+			altDsInfo := dsInfo
+			altDsInfo.Database = database
+			altCnnstr, err := generateConnectionString(altDsInfo, tlsSettings, pgxlogger)
+			if err != nil {
+				return nil, err
+			}
+			altConf, err := pgxpool.ParseConfig(altCnnstr)
+			if err != nil {
+				return nil, err
+			}
+			altConf.ConnConfig.LookupFunc = func(_ context.Context, host string) ([]string, error) {
+				return []string{host}, nil
+			}
+			applyPoolConfig(altConf, dsInfo.JsonData)
+			return pgxpool.NewWithConfig(factoryCtx, altConf)
+		}
+
+		_, handler, err := newPostgres(ctx, userFacingDefaultError, sqlCfg.RowLimit, dsInfo, cnnstr, pgxlogger, settings, poolFactory)
 		if err != nil {
 			pgxlogger.Error("Failed connecting to Postgres", "err", err)
 			return nil, err

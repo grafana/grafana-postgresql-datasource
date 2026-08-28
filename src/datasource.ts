@@ -1,6 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { type DataSourceInstanceSettings, type ScopedVars, type VariableWithMultiSupport } from '@grafana/data';
+import {
+  type DataSourceInstanceSettings,
+  type ScopedVars,
+  type VariableWithMultiSupport,
+} from '@grafana/data';
 import { type LanguageDefinition } from '@grafana/plugin-ui';
 import { type TemplateSrv } from '@grafana/runtime';
 import {
@@ -16,7 +20,7 @@ import {
 } from '@grafana/sql';
 
 import { PostgresQueryModel } from './PostgresQueryModel';
-import { getSchema, getTimescaleDBVersion, getVersion, showTables } from './postgresMetaQuery';
+import { getSchema, getTimescaleDBVersion, getVersion, showDatabases, showSchemas, showTables } from './postgresMetaQuery';
 import { fetchColumns, fetchTables, getSqlCompletionProvider } from './sqlCompletionProvider';
 import { getFieldConfig, toRawSql } from './sqlUtil';
 import { type PostgresOptions } from './types';
@@ -30,8 +34,32 @@ export class PostgresDatasource extends SqlDatasource {
     this.variables = new SQLVariableSupport(this);
   }
 
+  async testDatasource() {
+    const database = (this.instanceSettings.jsonData as PostgresOptions).database;
+    if (!database) {
+      return {
+        status: 'error',
+        message:
+          'You do not currently have a default database configured for this data source. Postgres requires a default database with which to connect. Please configure one in the Connection section above.',
+      };
+    }
+    return super.testDatasource();
+  }
+
   getQueryModel(target?: SQLQuery, templateSrv?: TemplateSrv, scopedVars?: ScopedVars): PostgresQueryModel {
     return new PostgresQueryModel(target, templateSrv, scopedVars);
+  }
+
+  applyTemplateVariables(target: SQLQuery, scopedVars: ScopedVars) {
+    return {
+      refId: target.refId,
+      datasource: this.getRef(),
+      rawSql: this.templateSrv.replace(target.rawSql, scopedVars, this.interpolateVariable),
+      format: target.format,
+      ...(target.database && { database: this.templateSrv.replace(target.database, scopedVars) }),
+      ...(target.dataset && { dataset: this.templateSrv.replace(target.dataset, scopedVars) }),
+      ...(target.table && { table: this.templateSrv.replace(target.table, scopedVars) }),
+    };
   }
 
   interpolateVariable = (value: string | string[] | number, variable: VariableWithMultiSupport) => {
@@ -78,8 +106,22 @@ export class PostgresDatasource extends SqlDatasource {
     return results[0];
   }
 
-  async fetchTables(): Promise<string[]> {
-    const tables = await this.runSql<{ table: string[] }>(showTables(), { refId: 'tables' });
+  async fetchDatabases(): Promise<string[]> {
+    const result = await this.runSql<{ datname: string }>(showDatabases(), { refId: 'databases' });
+    const databases = result.fields.datname?.values ?? [];
+    const variables = (this.templateSrv?.getVariables?.() ?? [])
+      .map((v) => `$${v.name}`)
+      .filter((v) => !databases.includes(v));
+    return [...databases, ...variables];
+  }
+
+  async fetchSchemas(database?: string): Promise<string[]> {
+    const result = await this.runSql<{ schema_name: string }>(showSchemas(), { refId: 'schemas', database });
+    return result.fields.schema_name?.values ?? [];
+  }
+
+  async fetchTables(schema?: string, database?: string): Promise<string[]> {
+    const tables = await this.runSql<{ table: string[] }>(showTables(schema), { refId: 'tables', database });
     return tables.fields.table?.values.flat() ?? [];
   }
 
@@ -101,14 +143,12 @@ export class PostgresDatasource extends SqlDatasource {
   }
 
   async fetchFields(query: SQLQuery): Promise<SQLSelectableValue[]> {
-    const { table } = query;
+    const { table, database } = query;
     if (table === undefined) {
-      // if no table-name, we are not able to query for fields
       return [];
     }
-    const schema = await this.runSql<{ column: string; type: string }>(getSchema(table), {
-      refId: `columns-${uuidv4()}`,
-    });
+    const sql = getSchema(table);
+    const schema = await this.runSql<{ column: string; type: string }>(sql, { refId: `columns-${uuidv4()}`, database });
     const result: SQLSelectableValue[] = [];
     for (let i = 0; i < schema.length; i++) {
       const column = schema.fields.column.values[i];
@@ -133,10 +173,12 @@ export class PostgresDatasource extends SqlDatasource {
       return this.db;
     }
 
-    return {
+    const enableMultiDatabase = (this.instanceSettings.jsonData as PostgresOptions).enableMultiDatabase === true;
+
+    const db: DB = {
       init: () => Promise.resolve(true),
-      datasets: () => Promise.resolve([]),
-      tables: () => this.fetchTables(),
+      datasets: (database?: string) => this.fetchSchemas(database),
+      tables: (schema?: string, database?: string) => this.fetchTables(schema, database),
       getEditorLanguageDefinition: () => this.getSqlLanguageDefinition(this.db),
       fields: async (query: SQLQuery) => {
         if (!query?.table) {
@@ -152,6 +194,13 @@ export class PostgresDatasource extends SqlDatasource {
         const tables = await this.fetchTables();
         return tables.map((t) => ({ name: t, completion: t }));
       },
+      labels: new Map([['dataset', 'Schema']]),
     };
+
+    if (enableMultiDatabase) {
+      db.databases = () => this.fetchDatabases();
+    }
+
+    return db;
   }
 }
