@@ -129,6 +129,15 @@ func TestIntegrationGenerateConnectionString(t *testing.T) {
 				"sslrootcert='i/am/coding/ca.crt' sslcert='i/am/coding/client.crt' sslkey='i/am/coding/client.key'",
 		},
 		{
+			desc:        "Direct TLS negotiation",
+			host:        "host",
+			user:        "user",
+			password:    "password",
+			database:    "database",
+			tlsSettings: tlsSettings{Mode: "require", Negotiation: "direct"},
+			expConnStr:  "user='user' host='host' dbname='database' password='password' sslmode='require' sslnegotiation='direct'",
+		},
+		{
 			desc:        "No password",
 			host:        "host",
 			user:        "user",

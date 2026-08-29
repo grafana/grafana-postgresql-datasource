@@ -46,6 +46,7 @@ type JsonData struct {
 	ConnectionTimeout       int    `json:"connectionTimeout"`
 	Timescaledb             bool   `json:"timescaledb"`
 	Mode                    string `json:"sslmode"`
+	Negotiation             string `json:"sslNegotiation"`
 	ConfigurationMethod     string `json:"tlsConfigurationMethod"`
 	TlsSkipVerify           bool   `json:"tlsSkipVerify"`
 	RootCertFile            string `json:"sslRootCertFile"`
