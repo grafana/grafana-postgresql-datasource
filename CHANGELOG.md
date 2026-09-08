@@ -1,5 +1,10 @@
 # Changelog
 
+## 13.0.3
+
+- Clear CVEs due in the current SLO window across frontend dependencies ([#169](https://github.com/grafana/grafana-postgresql-datasource/pull/169))
+- Add secure socks proxy (PDC) end to end coverage ([#159](https://github.com/grafana/grafana-postgresql-datasource/pull/159))
+
 ## 13.0.2
 
 - Bump go v1.26.7 and grafana-plugin-sdk-go v0.296.4 ([#119](https://github.com/grafana/grafana-postgresql-datasource/pull/119))
