@@ -1,3 +1,16 @@
+export function showDatabases() {
+  return "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname";
+}
+
+export function showSchemas() {
+  return `SELECT schema_name FROM information_schema.schemata
+    WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast',
+                              '_timescaledb_cache', '_timescaledb_catalog',
+                              '_timescaledb_internal', '_timescaledb_config',
+                              'timescaledb_information', 'timescaledb_experimental')
+    ORDER BY schema_name`;
+}
+
 export function getVersion() {
   return "SELECT current_setting('server_version_num')::int/100 as version";
 }
@@ -6,7 +19,14 @@ export function getTimescaleDBVersion() {
   return "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'";
 }
 
-export function showTables() {
+export function showTables(schema?: string) {
+  if (schema) {
+    const escapedSchema = schema.replace(/'/g, "''");
+    return `SELECT quote_ident(table_name) AS "table"
+    FROM information_schema.tables
+    WHERE quote_ident(table_schema) = quote_ident('${escapedSchema}')
+    ORDER BY 1`;
+  }
   return `SELECT
     CASE WHEN ${buildSchemaConstraint()}
       THEN quote_ident(table_name)

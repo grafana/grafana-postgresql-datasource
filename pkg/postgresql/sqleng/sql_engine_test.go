@@ -1,8 +1,10 @@
 package sqleng
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -703,4 +706,138 @@ func (t *testQueryResultTransformer) TransformQueryError(_ log.Logger, err error
 
 func (t *testQueryResultTransformer) GetConverterList() []sqlutil.StringConverter {
 	return nil
+}
+
+func TestGetPool(t *testing.T) {
+	logger := log.NewNullLogger()
+
+	t.Run("returns default pool when database is empty", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+		}
+		pool, err := handler.getPool(context.Background(), "")
+		require.NoError(t, err)
+		assert.Nil(t, pool)
+	})
+
+	t.Run("returns default pool when database matches configured database", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+		}
+		pool, err := handler.getPool(context.Background(), "mydb")
+		require.NoError(t, err)
+		assert.Nil(t, pool)
+	})
+
+	t.Run("rejects database name with null byte", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+		}
+		_, err := handler.getPool(context.Background(), "bad\x00db")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid database name")
+	})
+
+	t.Run("rejects database name with semicolon", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+		}
+		_, err := handler.getPool(context.Background(), "bad;db")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid database name")
+	})
+
+	t.Run("rejects database name with single quote", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+		}
+		_, err := handler.getPool(context.Background(), "bad'db")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid database name")
+	})
+
+	t.Run("returns error when poolFactory is nil", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:        nil,
+			log:         logger,
+			dsInfo:      DataSourceInfo{Database: "mydb"},
+			poolFactory: nil,
+		}
+		_, err := handler.getPool(context.Background(), "otherdb")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "per-query database override is not configured")
+	})
+
+	t.Run("returns error when pool cache is full", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+			poolFactory: func(ctx context.Context, database string) (*pgxpool.Pool, error) {
+				return nil, nil
+			},
+		}
+		atomic.StoreInt32(&handler.poolCacheCount, maxPoolCacheSize)
+		_, err := handler.getPool(context.Background(), "otherdb")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "maximum number of database connections reached")
+	})
+
+	t.Run("returns error when poolFactory fails", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+			poolFactory: func(ctx context.Context, database string) (*pgxpool.Pool, error) {
+				return nil, fmt.Errorf("connection refused")
+			},
+		}
+		_, err := handler.getPool(context.Background(), "otherdb")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to connect to database")
+		assert.Contains(t, err.Error(), "connection refused")
+	})
+
+	t.Run("passes correct database name to poolFactory", func(t *testing.T) {
+		var receivedDB string
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+			poolFactory: func(ctx context.Context, database string) (*pgxpool.Pool, error) {
+				receivedDB = database
+				return nil, fmt.Errorf("intentional error")
+			},
+		}
+		_, _ = handler.getPool(context.Background(), "targetdb")
+		assert.Equal(t, "targetdb", receivedDB)
+	})
+
+	t.Run("allows valid database names with special characters", func(t *testing.T) {
+		handler := &DataSourceHandler{
+			pool:   nil,
+			log:    logger,
+			dsInfo: DataSourceInfo{Database: "mydb"},
+			poolFactory: func(ctx context.Context, database string) (*pgxpool.Pool, error) {
+				return nil, fmt.Errorf("intentional")
+			},
+		}
+
+		for _, name := range []string{"my-db", "my_db", "my.db", "DB123", "a"} {
+			_, err := handler.getPool(context.Background(), name)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to connect to database",
+				"database name %q should pass validation", name)
+		}
+	})
 }

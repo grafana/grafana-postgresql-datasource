@@ -736,6 +736,128 @@ describe('PostgreSQLDatasource', () => {
     });
   });
 
+  describe('applyTemplateVariables', () => {
+    it('should template-replace database, dataset, and table when present', () => {
+      const templateSrv = {
+        replace: (text: string, _scopedVars: unknown) => text.replace(/\$\{?(\w+)\}?/g, 'replaced_$1'),
+      };
+      const { ds } = setupTestContext({}, undefined, templateSrv);
+
+      const target: SQLQuery = {
+        refId: 'A',
+        rawSql: 'SELECT * FROM $table',
+        format: QueryFormat.Table,
+        database: '$mydb',
+        dataset: '$myschema',
+        table: '$mytable',
+      };
+
+      const result = ds.applyTemplateVariables(target, {});
+
+      expect(result.refId).toBe('A');
+      expect(result.rawSql).toContain('replaced_');
+      expect(result.database).toBe('replaced_mydb');
+      expect(result.dataset).toBe('replaced_myschema');
+      expect(result.table).toBe('replaced_mytable');
+    });
+
+    it('should omit database, dataset, table when not set on target', () => {
+      const templateSrv = {
+        replace: (text: string) => text,
+      };
+      const { ds } = setupTestContext({}, undefined, templateSrv);
+
+      const target: SQLQuery = {
+        refId: 'B',
+        rawSql: 'SELECT 1',
+        format: QueryFormat.Table,
+      };
+
+      const result = ds.applyTemplateVariables(target, {});
+
+      expect(result.refId).toBe('B');
+      expect(result).not.toHaveProperty('database');
+      expect(result).not.toHaveProperty('dataset');
+      expect(result).not.toHaveProperty('table');
+    });
+  });
+
+  describe('fetchDatabases', () => {
+    it('should return a list of database names', async () => {
+      const response = {
+        results: {
+          databases: {
+            refId: 'databases',
+            frames: [
+              dataFrameToJSON(
+                createDataFrame({
+                  fields: [{ name: 'datname', type: FieldType.string, values: ['postgres', 'mydb', 'testdb'] }],
+                })
+              ),
+            ],
+          },
+        },
+      };
+
+      const { ds } = setupTestContext(response);
+      const results = await ds.fetchDatabases();
+      expect(results).toEqual(['postgres', 'mydb', 'testdb']);
+    });
+
+    it('should return empty array when no databases are returned', async () => {
+      const response = {
+        results: {
+          databases: {
+            refId: 'databases',
+            frames: [],
+          },
+        },
+      };
+
+      const { ds } = setupTestContext(response);
+      const results = await ds.fetchDatabases();
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('fetchSchemas', () => {
+    it('should return a list of schema names', async () => {
+      const response = {
+        results: {
+          schemas: {
+            refId: 'schemas',
+            frames: [
+              dataFrameToJSON(
+                createDataFrame({
+                  fields: [{ name: 'schema_name', type: FieldType.string, values: ['public', 'myschema'] }],
+                })
+              ),
+            ],
+          },
+        },
+      };
+
+      const { ds } = setupTestContext(response);
+      const results = await ds.fetchSchemas();
+      expect(results).toEqual(['public', 'myschema']);
+    });
+
+    it('should return empty array when no schemas are returned', async () => {
+      const response = {
+        results: {
+          schemas: {
+            refId: 'schemas',
+            frames: [],
+          },
+        },
+      };
+
+      const { ds } = setupTestContext(response);
+      const results = await ds.fetchSchemas();
+      expect(results).toEqual([]);
+    });
+  });
+
   describe('targetContainsTemplate', () => {
     it('given query that contains template variable it should return true', () => {
       const rawSql = `SELECT

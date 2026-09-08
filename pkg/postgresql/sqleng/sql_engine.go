@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -80,6 +81,12 @@ type DataPluginConfiguration struct {
 	RowLimit          int64
 }
 
+// PoolFactory creates a connection pool for the given database name.
+type PoolFactory func(ctx context.Context, database string) (*pgxpool.Pool, error)
+
+// maxPoolCacheSize limits the number of alternate-database pools to prevent resource exhaustion.
+const maxPoolCacheSize = 32
+
 type DataSourceHandler struct {
 	macroEngine            SQLMacroEngine
 	queryResultTransformer SqlQueryResultTransformer
@@ -90,6 +97,9 @@ type DataSourceHandler struct {
 	rowLimit               int64
 	userError              string
 	pool                   *pgxpool.Pool
+	poolCache      sync.Map
+	poolCacheCount int32 // only incremented; all pools are closed together in Dispose()
+	poolFactory            PoolFactory
 }
 
 type QueryJson struct {
@@ -99,6 +109,7 @@ type QueryJson struct {
 	FillMode     string  `json:"fillMode"`
 	FillValue    float64 `json:"fillValue"`
 	Format       string  `json:"format"`
+	Database     string  `json:"database"`
 }
 
 func (e *DataSourceHandler) TransformQueryError(logger log.Logger, err error) error {
@@ -115,7 +126,7 @@ func (e *DataSourceHandler) TransformQueryError(logger log.Logger, err error) er
 }
 
 func NewQueryDataHandler(userFacingDefaultError string, p *pgxpool.Pool, config DataPluginConfiguration, queryResultTransformer SqlQueryResultTransformer,
-	macroEngine SQLMacroEngine, log log.Logger) (*DataSourceHandler, error) {
+	macroEngine SQLMacroEngine, log log.Logger, poolFactory PoolFactory) (*DataSourceHandler, error) {
 	queryDataHandler := DataSourceHandler{
 		queryResultTransformer: queryResultTransformer,
 		macroEngine:            macroEngine,
@@ -124,6 +135,7 @@ func NewQueryDataHandler(userFacingDefaultError string, p *pgxpool.Pool, config 
 		dsInfo:                 config.DSInfo,
 		rowLimit:               config.RowLimit,
 		userError:              userFacingDefaultError,
+		poolFactory:            poolFactory,
 	}
 
 	if len(config.TimeColumnNames) > 0 {
@@ -146,6 +158,11 @@ type DBDataResponse struct {
 func (e *DataSourceHandler) Dispose() {
 	e.log.Debug("Disposing DB...")
 
+	e.poolCache.Range(func(key, value any) bool {
+		value.(*pgxpool.Pool).Close()
+		return true
+	})
+
 	if e.pool != nil {
 		e.pool.Close()
 	}
@@ -155,6 +172,43 @@ func (e *DataSourceHandler) Dispose() {
 
 func (e *DataSourceHandler) Ping(ctx context.Context) error {
 	return e.pool.Ping(ctx)
+}
+
+func (e *DataSourceHandler) getPool(ctx context.Context, database string) (*pgxpool.Pool, error) {
+	if database == "" || database == e.dsInfo.Database {
+		return e.pool, nil
+	}
+
+	// Block characters that could break the connection string or enable injection.
+	// The name is interpolated into a libpq key=value string by generateConnectionString.
+	if strings.ContainsAny(database, "\x00;'") {
+		return nil, fmt.Errorf("invalid database name")
+	}
+
+	if v, ok := e.poolCache.Load(database); ok {
+		return v.(*pgxpool.Pool), nil
+	}
+
+	if e.poolFactory == nil {
+		return nil, fmt.Errorf("per-query database override is not configured")
+	}
+
+	if atomic.LoadInt32(&e.poolCacheCount) >= maxPoolCacheSize {
+		return nil, fmt.Errorf("maximum number of database connections reached")
+	}
+
+	p, err := e.poolFactory(ctx, database)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database %q: %w", database, err)
+	}
+
+	if actual, loaded := e.poolCache.LoadOrStore(database, p); loaded {
+		p.Close()
+		return actual.(*pgxpool.Pool), nil
+	}
+
+	atomic.AddInt32(&e.poolCacheCount, 1)
+	return p, nil
 }
 
 func (e *DataSourceHandler) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
@@ -198,8 +252,8 @@ func (e *DataSourceHandler) QueryData(ctx context.Context, req *backend.QueryDat
 	return result, nil
 }
 
-func (e *DataSourceHandler) execQuery(ctx context.Context, query string) ([]*pgconn.Result, error) {
-	c, err := e.pool.Acquire(ctx)
+func (e *DataSourceHandler) execQuery(ctx context.Context, query string, pool *pgxpool.Pool) ([]*pgconn.Result, error) {
+	c, err := pool.Acquire(ctx)
 	if err != nil {
 		return nil, backend.DownstreamErrorf("failed to acquire connection: %w", err)
 	}
@@ -226,6 +280,12 @@ func (e *DataSourceHandler) executeQuery(queryContext context.Context, query bac
 		panic("Query model property rawSql should not be empty at this point")
 	}
 
+	pool, err := e.getPool(queryContext, queryJSON.Database)
+	if err != nil {
+		e.handleQueryError("database pool error", err, "", backend.ErrorSourceDownstream, ch, queryResult)
+		return
+	}
+
 	// A trailing SQLCommenter attribution tag must reach the database verbatim,
 	// so split it off before interpolation and re-append it afterwards. This
 	// keeps it out of comment stripping and macro substitution, and prevents a
@@ -236,14 +296,14 @@ func (e *DataSourceHandler) executeQuery(queryContext context.Context, query bac
 	interpolatedQuery := Interpolate(query, query.TimeRange, e.dsInfo.JsonData.TimeInterval, rawSQL)
 
 	// data source specific substitutions
-	interpolatedQuery, err := e.macroEngine.Interpolate(&query, query.TimeRange, interpolatedQuery)
+	interpolatedQuery, err = e.macroEngine.Interpolate(&query, query.TimeRange, interpolatedQuery)
 	if err != nil {
 		e.handleQueryError("interpolation failed", e.TransformQueryError(logger, err), interpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
 		return
 	}
 	interpolatedQuery += sqlCommenterTag
 
-	results, err := e.execQuery(queryContext, interpolatedQuery)
+	results, err := e.execQuery(queryContext, interpolatedQuery, pool)
 	if err != nil {
 		e.handleQueryError("db query error", e.TransformQueryError(logger, err), interpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
 		return

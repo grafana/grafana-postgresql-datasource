@@ -207,7 +207,7 @@ func TestIntegrationPostgres(t *testing.T) {
 
 	cnnstr := postgresTestDBConnString()
 
-	p, exe, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{})
+	p, exe, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{}, nil)
 
 	require.NoError(t, err)
 
@@ -1303,7 +1303,7 @@ func TestIntegrationPostgres(t *testing.T) {
 				JsonData:                jsonData,
 				DecryptedSecureJSONData: map[string]string{},
 			}
-			_, handler, err := newPostgres(t.Context(), "error", 1, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{})
+			_, handler, err := newPostgres(t.Context(), "error", 1, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{}, nil)
 
 			require.NoError(t, err)
 
@@ -1559,7 +1559,7 @@ func TestIntegrationPostgres(t *testing.T) {
 		cnnstr := postgresTestDBConnString()
 		require.NotContains(t, cnnstr, "password=", "Make sure that password is not in the connection string")
 
-		pgpassPool, _, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{})
+		pgpassPool, _, err := newPostgres(t.Context(), "error", 10000, dsInfo, cnnstr, logger, backend.DataSourceInstanceSettings{}, nil)
 		require.NoError(t, err)
 
 		_, err = pgpassPool.Query(t.Context(), "SELECT 1") // Test connection
