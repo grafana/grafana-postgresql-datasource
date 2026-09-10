@@ -31,7 +31,13 @@ import {
   Tooltip,
 } from '@grafana/ui';
 
-import { type PostgresOptions, PostgresTLSMethods, PostgresTLSModes, type SecureJsonData } from '../types';
+import {
+  type PostgresOptions,
+  PostgresTLSMethods,
+  PostgresTLSModes,
+  PostgresTLSNegotiations,
+  type SecureJsonData,
+} from '../types';
 
 import { useAutoDetectFeatures } from './useAutoDetectFeatures';
 
@@ -70,6 +76,11 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
     { value: PostgresTLSModes.require, label: 'require' },
     { value: PostgresTLSModes.verifyCA, label: 'verify-ca' },
     { value: PostgresTLSModes.verifyFull, label: 'verify-full' },
+  ];
+
+  const tlsNegotiations: Array<ComboboxOption<PostgresTLSNegotiations>> = [
+    { value: PostgresTLSNegotiations.postgres, label: 'postgres' },
+    { value: PostgresTLSNegotiations.direct, label: 'direct' },
   ];
 
   const tlsMethods: Array<ComboboxOption<PostgresTLSMethods>> = [
@@ -200,7 +211,38 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
             />
           </Field>
 
-          {options.jsonData.sslmode !== PostgresTLSModes.disable ? (
+          {jsonData.sslmode !== PostgresTLSModes.disable ? (
+            <Field
+              noMargin
+              label={
+                <Label>
+                  <EditorStack gap={0.5}>
+                    <span>TLS/SSL Negotiation</span>
+                    <Tooltip
+                      content={
+                        <span>
+                          This option controls how the TLS/SSL connection is negotiated. Selecting <i>direct</i> starts
+                          the TLS handshake immediately instead of requesting it over the PostgreSQL protocol. It is only supported
+                          by PostgreSQL 17 or later. Defaults to <i>postgres</i> negotiation.
+                        </span>
+                      }
+                    >
+                      <Icon name="info-circle" size="sm" />
+                    </Tooltip>
+                  </EditorStack>
+                </Label>
+              }
+            >
+              <Combobox
+                options={tlsNegotiations}
+                value={jsonData.sslNegotiation || PostgresTLSNegotiations.postgres}
+                onChange={onJSONDataOptionSelected('sslNegotiation')}
+                width={WIDTH_LONG}
+              />
+            </Field>
+          ) : null}
+
+          {jsonData.sslmode !== PostgresTLSModes.disable ? (
             <Field
               noMargin
               label={

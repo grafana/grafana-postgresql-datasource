@@ -1,6 +1,15 @@
 // Jest setup provided by Grafana scaffolding
 import './.config/jest-setup';
 
+global.IntersectionObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+HTMLCanvasElement.prototype.getContext = () => ({
+  measureText: (text) => ({ width: String(text).length * 8 }),
+});
+
 // jsdom doesn't compute CSS display values from user-agent stylesheets.
 // dom-accessibility-api uses getComputedStyle(el).getPropertyValue('display') to
 // decide whether to insert a space separator between text nodes when computing

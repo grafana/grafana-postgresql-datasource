@@ -8,4 +8,16 @@ module.exports = {
   // Jest configuration provided by Grafana scaffolding
   ...require('./.config/jest.config'),
   transformIgnorePatterns: [nodeModulesToTransform([...grafanaESModules, '@marcbachmann/cel-js'])],
+  transform: {
+    '^.+\\.(t|j)sx?$': [
+      '@swc/jest',
+      {
+        sourceMaps: 'inline',
+        jsc: {
+          parser: { syntax: 'typescript', tsx: true, decorators: false, dynamicImport: true },
+          transform: { react: { runtime: 'automatic' } },
+        },
+      },
+    ],
+  },
 };

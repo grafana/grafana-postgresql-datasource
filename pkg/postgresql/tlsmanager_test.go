@@ -61,6 +61,29 @@ func TestGetTLSSettings(t *testing.T) {
 				CertKeyFile:         "i/am/coding/client.key",
 			},
 		},
+		{
+			desc:    "Direct TLS negotiation",
+			updated: updatedTime.Add(2 * time.Minute),
+			jsonData: sqleng.JsonData{
+				Mode:                "require",
+				Negotiation:         "direct",
+				ConfigurationMethod: "file-path",
+			},
+			tlsSettings: tlsSettings{
+				Mode:                "require",
+				Negotiation:         "direct",
+				ConfigurationMethod: "file-path",
+			},
+		},
+		{
+			desc:    "TLS negotiation ignored when TLS is disabled",
+			updated: updatedTime.Add(3 * time.Minute),
+			jsonData: sqleng.JsonData{
+				Mode:        "disable",
+				Negotiation: "direct",
+			},
+			tlsSettings: tlsSettings{Mode: "disable"},
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
