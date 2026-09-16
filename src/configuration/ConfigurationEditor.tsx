@@ -91,6 +91,11 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
     updateDatasourcePluginJsonDataOption(props, 'connMaxLifetime', number);
   };
 
+  const onResponseLimitChanged = (event: SyntheticEvent<HTMLInputElement>) => {
+    const raw = event.currentTarget.value;
+    updateDatasourcePluginJsonDataOption(props, 'responseLimitBytes', raw === '' ? undefined : Number(raw));
+  };
+
   const onTimeScaleDBChanged = (event: SyntheticEvent<HTMLInputElement>) => {
     updateDatasourcePluginJsonDataOption(props, 'timescaledb', event.currentTarget.checked);
   };
@@ -441,6 +446,36 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
                 jsonData={jsonData}
                 onMaxLifetimeChanged={onMaxLifetimeChanged}
               />
+              <Field
+                noMargin
+                label={
+                  <Label>
+                    <EditorStack gap={0.5}>
+                      <span>Response size limit</span>
+                      <Tooltip
+                        content={
+                          <span>
+                            Maximum total size, in bytes, of a single query&apos;s result set. When the limit is reached
+                            the query stops and the partial result is returned with a warning. Leave empty or set to{' '}
+                            <code>0</code> to disable.
+                          </span>
+                        }
+                      >
+                        <Icon name="info-circle" size="sm" />
+                      </Tooltip>
+                    </EditorStack>
+                  </Label>
+                }
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={jsonData.responseLimitBytes ?? ''}
+                  onChange={onResponseLimitChanged}
+                  width={WIDTH_LONG}
+                />
+              </Field>
             </Stack>
           </ConfigSubSection>
 

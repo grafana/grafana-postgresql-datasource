@@ -60,6 +60,7 @@ type JsonData struct {
 	SecureDSProxyUsername   string `json:"secureSocksProxyUsername"`
 	AllowCleartextPasswords bool   `json:"allowCleartextPasswords"`
 	AuthenticationType      string `json:"authenticationType"`
+	ResponseLimitBytes      int64  `json:"responseLimitBytes"`
 }
 
 type DataSourceInfo struct {
@@ -74,10 +75,11 @@ type DataSourceInfo struct {
 }
 
 type DataPluginConfiguration struct {
-	DSInfo            DataSourceInfo
-	TimeColumnNames   []string
-	MetricColumnTypes []string
-	RowLimit          int64
+	DSInfo             DataSourceInfo
+	TimeColumnNames    []string
+	MetricColumnTypes  []string
+	RowLimit           int64
+	ResponseLimitBytes int64
 }
 
 type DataSourceHandler struct {
@@ -88,6 +90,7 @@ type DataSourceHandler struct {
 	log                    log.Logger
 	dsInfo                 DataSourceInfo
 	rowLimit               int64
+	responseLimitBytes     int64
 	userError              string
 	pool                   *pgxpool.Pool
 }
@@ -123,6 +126,7 @@ func NewQueryDataHandler(userFacingDefaultError string, p *pgxpool.Pool, config 
 		log:                    log,
 		dsInfo:                 config.DSInfo,
 		rowLimit:               config.RowLimit,
+		responseLimitBytes:     config.ResponseLimitBytes,
 		userError:              userFacingDefaultError,
 	}
 
@@ -198,17 +202,68 @@ func (e *DataSourceHandler) QueryData(ctx context.Context, req *backend.QueryDat
 	return result, nil
 }
 
-func (e *DataSourceHandler) execQuery(ctx context.Context, query string) ([]*pgconn.Result, error) {
+// queryToDataFrame runs query and streams the result straight into a data.Frame,
+// one row at a time, instead of buffering the whole result set in memory first.
+// It stops reading as soon as the row-count or response-byte limit is hit,
+// appending a warning notice to the frame. It also returns the field
+// descriptions of the first row-returning result, which the caller needs to
+// build the query model.
+func (e *DataSourceHandler) queryToDataFrame(ctx context.Context, query string) (*data.Frame, []pgconn.FieldDescription, error) {
 	c, err := e.pool.Acquire(ctx)
 	if err != nil {
-		return nil, backend.DownstreamErrorf("failed to acquire connection: %w", err)
+		return nil, nil, backend.DownstreamErrorf("failed to acquire connection: %w", err)
 	}
+	// When we stop early (a limit was hit) the connection still has unread rows
+	// queued. We deliberately do not drain them - mrr.Close()/rr.Close() would
+	// read them all into memory, which is exactly what the limit exists to
+	// prevent. Release() sees the busy connection and destroys it instead.
 	defer c.Release()
 
 	mrr := c.Conn().PgConn().Exec(ctx, query)
-	// Close returns the first error that occurred during the MultiResultReader's use. We will log that later.
-	defer mrr.Close() //nolint:errcheck
-	return mrr.ReadAll()
+
+	fb := newFrameBuilder(e.rowLimit, e.responseLimitBytes)
+
+	for mrr.NextResult() {
+		rr := mrr.ResultReader()
+		fds := rr.FieldDescriptions()
+
+		if err := fb.startResult(fds); err != nil {
+			return nil, nil, err
+		}
+
+		if len(fds) == 0 {
+			// A statement that does not return rows (INSERT/UPDATE/DELETE/SET/...).
+			if _, err := rr.Close(); err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
+
+		limited := false
+		for rr.NextRow() {
+			stop, err := fb.appendRow(fds, rr.Values())
+			if err != nil {
+				return nil, nil, err
+			}
+			if stop {
+				limited = true
+				break
+			}
+		}
+		if limited {
+			return fb.frame(), fb.firstFieldDescriptions, nil
+		}
+
+		if _, err := rr.Close(); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if err := mrr.Close(); err != nil {
+		return nil, nil, err
+	}
+
+	return fb.frame(), fb.firstFieldDescriptions, nil
 }
 
 func (e *DataSourceHandler) executeQuery(queryContext context.Context, query backend.DataQuery, wg *sync.WaitGroup,
@@ -243,21 +298,15 @@ func (e *DataSourceHandler) executeQuery(queryContext context.Context, query bac
 	}
 	interpolatedQuery += sqlCommenterTag
 
-	results, err := e.execQuery(queryContext, interpolatedQuery)
+	frame, fieldDescriptions, err := e.queryToDataFrame(queryContext, interpolatedQuery)
 	if err != nil {
 		e.handleQueryError("db query error", e.TransformQueryError(logger, err), interpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
 		return
 	}
 
-	qm, err := e.newProcessCfg(queryContext, query, results, interpolatedQuery)
+	qm, err := e.newProcessCfg(queryContext, query, fieldDescriptions, interpolatedQuery)
 	if err != nil {
 		e.handleQueryError("failed to get configurations", err, interpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
-		return
-	}
-
-	frame, err := convertResultsToFrame(results, e.rowLimit)
-	if err != nil {
-		e.handleQueryError("convert frame from rows error", err, interpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
 		return
 	}
 
@@ -388,36 +437,28 @@ var Interpolate = func(query backend.DataQuery, timeRange backend.TimeRange, tim
 }
 
 func (e *DataSourceHandler) newProcessCfg(queryContext context.Context, query backend.DataQuery,
-	results []*pgconn.Result, interpolatedQuery string) (*dataQueryModel, error) {
-	// Calculate total number of fields to preallocate slices
-	totalFields := 0
-	for _, result := range results {
-		totalFields += len(result.FieldDescriptions)
-	}
+	fieldDescriptions []pgconn.FieldDescription, interpolatedQuery string) (*dataQueryModel, error) {
+	columnNames := make([]string, 0, len(fieldDescriptions))
+	columnTypes := make([]string, 0, len(fieldDescriptions))
 
-	columnNames := make([]string, 0, totalFields)
-	columnTypes := make([]string, 0, totalFields)
-
-	// The results will contain column information in the metadata
-	for _, result := range results {
-		// Get column names from the result metadata
-		for _, field := range result.FieldDescriptions {
-			columnNames = append(columnNames, field.Name)
-			pqtype, ok := pgtype.NewMap().TypeForOID(field.DataTypeOID)
-			if !ok {
-				// Handle special cases for field types
-				switch field.DataTypeOID {
-				case pgtype.TimetzOID:
-					columnTypes = append(columnTypes, "timetz")
-				// money type is 790
-				case 790:
-					columnTypes = append(columnTypes, "money")
-				default:
-					columnTypes = append(columnTypes, "unknown")
-				}
-			} else {
-				columnTypes = append(columnTypes, pqtype.Name)
+	// The field descriptions of the first row-returning result carry the column
+	// metadata (a multi-statement query's later results must have the same shape).
+	for _, field := range fieldDescriptions {
+		columnNames = append(columnNames, field.Name)
+		pqtype, ok := pgtype.NewMap().TypeForOID(field.DataTypeOID)
+		if !ok {
+			// Handle special cases for field types
+			switch field.DataTypeOID {
+			case pgtype.TimetzOID:
+				columnTypes = append(columnTypes, "timetz")
+			// money type is 790
+			case 790:
+				columnTypes = append(columnTypes, "money")
+			default:
+				columnTypes = append(columnTypes, "unknown")
 			}
+		} else {
+			columnTypes = append(columnTypes, pqtype.Name)
 		}
 	}
 
@@ -538,95 +579,127 @@ func convertSQLTimeColumnsToEpochMS(frame *data.Frame, qm *dataQueryModel) error
 	return nil
 }
 
-func convertResultsToFrame(results []*pgconn.Result, rowLimit int64) (*data.Frame, error) {
-	m := pgtype.NewMap()
+// frameBuilder incrementally assembles a data.Frame from query results as they
+// are streamed off the wire, enforcing the row-count and response-byte limits
+// row by row so a large result never has to be fully materialised in memory.
+type frameBuilder struct {
+	m         *pgtype.Map
+	rowLimit  int64
+	byteLimit int64
 
-	// Find the first result that returns rows (has field descriptions).
-	// We check FieldDescriptions rather than CommandTag.Select() because commands
-	// like EXPLAIN and EXPLAIN ANALYZE return rows but have a non-SELECT command tag.
-	var firstSelectResult *pgconn.Result
-	for _, result := range results {
-		if len(result.FieldDescriptions) > 0 {
-			firstSelectResult = result
-			break
+	dataFrame              *data.Frame
+	firstFieldDescriptions []pgconn.FieldDescription
+	rowCount               int64
+	byteCount              int64
+	limited                bool
+}
+
+func newFrameBuilder(rowLimit, byteLimit int64) *frameBuilder {
+	return &frameBuilder{m: pgtype.NewMap(), rowLimit: rowLimit, byteLimit: byteLimit}
+}
+
+// startResult prepares the builder for the next result set. The first
+// row-returning result establishes the frame's columns; later results in a
+// multi-statement query must match that shape. Results that return no rows
+// (INSERT/UPDATE/DELETE/SET/...) are ignored - callers pass an empty fds slice.
+//
+// We key on len(fds) rather than CommandTag.Select() because EXPLAIN and
+// EXPLAIN ANALYZE return rows but carry a non-SELECT command tag.
+func (b *frameBuilder) startResult(fds []pgconn.FieldDescription) error {
+	if len(fds) == 0 {
+		return nil
+	}
+
+	if b.dataFrame == nil {
+		b.firstFieldDescriptions = append([]pgconn.FieldDescription(nil), fds...)
+
+		fieldTypes, err := getFieldTypesFromDescriptions(fds, b.m)
+		if err != nil {
+			return err
+		}
+		fields := make(data.Fields, len(fds))
+		for i, fd := range fds {
+			fields[i] = data.NewFieldFromFieldType(fieldTypes[i], 0)
+			fields[i].Name = fd.Name
+		}
+		b.dataFrame = data.NewFrame("", fields...)
+		return nil
+	}
+
+	if len(fds) != len(b.dataFrame.Fields) {
+		return fmt.Errorf("incompatible result structure: expected %d columns, got %d columns",
+			len(b.dataFrame.Fields), len(fds))
+	}
+	for i, fd := range fds {
+		if fd.Name != b.dataFrame.Fields[i].Name {
+			return fmt.Errorf("column name mismatch at position %d: expected %q, got %q",
+				i, b.dataFrame.Fields[i].Name, fd.Name)
 		}
 	}
+	return nil
+}
 
-	// If no row-returning results found, return empty frame
-	if firstSelectResult == nil {
-		return data.NewFrame(""), nil
+// appendRow converts and appends one row. It returns stop=true once a limit has
+// been reached (after appending a warning notice to the frame), at which point
+// the caller must stop reading and not call appendRow again.
+func (b *frameBuilder) appendRow(fds []pgconn.FieldDescription, values [][]byte) (bool, error) {
+	if b.limited {
+		return true, nil
 	}
 
-	// Create frame structure based on the first SELECT result
-	fields := make(data.Fields, len(firstSelectResult.FieldDescriptions))
-	fieldTypes, err := getFieldTypesFromDescriptions(firstSelectResult.FieldDescriptions, m)
-	if err != nil {
-		return nil, err
+	if b.rowLimit > 0 && b.rowCount >= b.rowLimit {
+		b.dataFrame.AppendNotices(data.Notice{
+			Severity: data.NoticeSeverityWarning,
+			Text:     fmt.Sprintf("Results have been limited to %v because the SQL row limit was reached", b.rowLimit),
+		})
+		b.limited = true
+		return true, nil
 	}
 
-	for i, v := range firstSelectResult.FieldDescriptions {
-		fields[i] = data.NewFieldFromFieldType(fieldTypes[i], 0)
-		fields[i].Name = v.Name
-	}
-	frame := *data.NewFrame("", fields...)
-
-	// Process all row-returning results, but validate column compatibility
-	for _, result := range results {
-		// Skip statements that don't return rows (e.g. INSERT, UPDATE, DELETE)
-		if len(result.FieldDescriptions) == 0 {
+	row := make([]any, len(fds))
+	rowBytes := 0
+	for i, fd := range fds {
+		rawValue := values[i]
+		if rawValue == nil {
+			row[i] = nil
 			continue
 		}
+		rowBytes += len(rawValue)
 
-		// Validate that this result has the same structure as the frame
-		if len(result.FieldDescriptions) != len(frame.Fields) {
-			return nil, fmt.Errorf("incompatible result structure: expected %d columns, got %d columns",
-				len(frame.Fields), len(result.FieldDescriptions))
+		convertedValue, err := convertPostgresValue(rawValue, fd, b.m)
+		if err != nil {
+			return false, err
 		}
-
-		// Validate column names and types match
-		for i, fd := range result.FieldDescriptions {
-			if fd.Name != frame.Fields[i].Name {
-				return nil, fmt.Errorf("column name mismatch at position %d: expected %q, got %q",
-					i, frame.Fields[i].Name, fd.Name)
-			}
-		}
-
-		fieldDescriptions := result.FieldDescriptions
-		for rowIdx := range result.Rows {
-			if rowIdx == int(rowLimit) {
-				frame.AppendNotices(data.Notice{
-					Severity: data.NoticeSeverityWarning,
-					Text:     fmt.Sprintf("Results have been limited to %v because the SQL row limit was reached", rowLimit),
-				})
-				break
-			}
-			row := make([]any, len(fieldDescriptions))
-			for colIdx, fd := range fieldDescriptions {
-				rawValue := result.Rows[rowIdx][colIdx]
-
-				if rawValue == nil {
-					row[colIdx] = nil
-					continue
-				}
-
-				convertedValue, err := convertPostgresValue(rawValue, fd, m)
-				if err != nil {
-					return nil, err
-				}
-				row[colIdx] = convertedValue
-			}
-
-			// Validate row length matches frame field count before appending
-			if len(row) != len(frame.Fields) {
-				return nil, fmt.Errorf("row data length mismatch: expected %d values, got %d values",
-					len(frame.Fields), len(row))
-			}
-
-			frame.AppendRow(row...)
-		}
+		row[i] = convertedValue
 	}
 
-	return &frame, nil
+	if len(row) != len(b.dataFrame.Fields) {
+		return false, fmt.Errorf("row data length mismatch: expected %d values, got %d values",
+			len(b.dataFrame.Fields), len(row))
+	}
+
+	b.dataFrame.AppendRow(row...)
+	b.rowCount++
+	b.byteCount += int64(rowBytes)
+
+	if b.byteLimit > 0 && b.byteCount >= b.byteLimit {
+		b.dataFrame.AppendNotices(data.Notice{
+			Severity: data.NoticeSeverityWarning,
+			Text:     fmt.Sprintf("Results have been limited because the response size limit of %d bytes was reached", b.byteLimit),
+		})
+		b.limited = true
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// frame returns the assembled frame, or an empty frame if no result returned rows.
+func (b *frameBuilder) frame() *data.Frame {
+	if b.dataFrame == nil {
+		return data.NewFrame("")
+	}
+	return b.dataFrame
 }
 
 // convertPostgresValue converts a raw PostgreSQL value to the appropriate Go type
