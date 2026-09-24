@@ -17,3 +17,24 @@ datasources:
       postgresVersion: 1500
     secureJsonData:
       password: "${DS_INSTANCE_PASSWORD}"
+
+  # Same backend as `postgresql`, routed through the local secure socks proxy
+  # (see docker-compose.yaml's microsocks service). Used to validate the
+  # PDC/socks-proxy connection path end to end.
+  - name: postgresql-socks-proxy
+    type: grafana-postgresql-datasource
+    uid: postgresql-socks-proxy-e2e
+    access: proxy
+    isDefault: false
+    orgId: 1
+    version: 1
+    editable: true
+    url: "${DS_INSTANCE_HOST}:${DS_INSTANCE_PORT}"
+    user: "${DS_INSTANCE_USERNAME}"
+    jsonData:
+      database: "${DS_INSTANCE_DATABASE}"
+      sslmode: disable
+      postgresVersion: 1500
+      enableSecureSocksProxy: true
+    secureJsonData:
+      password: "${DS_INSTANCE_PASSWORD}"

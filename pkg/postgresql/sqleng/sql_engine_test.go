@@ -704,3 +704,126 @@ func (t *testQueryResultTransformer) TransformQueryError(_ log.Logger, err error
 func (t *testQueryResultTransformer) GetConverterList() []sqlutil.StringConverter {
 	return nil
 }
+
+func TestApplyFillRowLimit(t *testing.T) {
+	// newFillFrame builds a wide time-series frame holding a single row and
+	// numValueFields value columns, mirroring a query that selects many columns
+	// from a table containing one row.
+	newFillFrame := func(from time.Time, numValueFields int) *data.Frame {
+		fields := []*data.Field{data.NewField("Time", nil, []time.Time{from.Add(time.Hour)})}
+		for i := 0; i < numValueFields; i++ {
+			v := 1.0
+			fields = append(fields, data.NewField(fmt.Sprintf("m%d", i+1), nil, []*float64{&v}))
+		}
+		return data.NewFrame("", fields...)
+	}
+
+	const rowLimit = int64(1000000)
+
+	testCases := []struct {
+		desc           string
+		rangeDuration  time.Duration
+		numValueFields int
+		expFilled      bool
+	}{
+		{
+			desc:           "fills when the resampled frame fits within the row limit",
+			rangeDuration:  time.Hour,
+			numValueFields: 10,
+			expFilled:      true,
+		},
+		{
+			// 21 fields is over the free allowance, but the reduced allowance of
+			// 476190 points still covers this range, so an ordinary wide panel
+			// keeps its fill.
+			desc:           "fills a wide frame whose range fits the reduced allowance",
+			rangeDuration:  100000 * time.Second,
+			numValueFields: 20,
+			expFilled:      true,
+		},
+		{
+			desc:           "skips when the number of fill points exceeds the row limit",
+			rangeDuration:  2000 * time.Hour,
+			numValueFields: 1,
+			expFilled:      false,
+		},
+		{
+			desc:           "skips a wide frame whose range exceeds the reduced allowance",
+			rangeDuration:  600000 * time.Second,
+			numValueFields: 20,
+			expFilled:      false,
+		},
+		{
+			// A point count that stays under the row limit on its own still
+			// allocates one cell per field per point, so a very wide result set
+			// multiplies it far past anything the limit should permit.
+			desc:           "skips when the frame is wide enough to multiply the point count past the limit",
+			rangeDuration:  9 * 24 * time.Hour,
+			numValueFields: 1000,
+			expFilled:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			e := &DataSourceHandler{rowLimit: rowLimit, log: backend.NewLoggerWith("logger", "postgresql.test")}
+
+			from := time.Unix(0, 0).UTC()
+			qm := &dataQueryModel{
+				FillMissing: &data.FillMissing{Mode: data.FillModeValue, Value: 0},
+				Interval:    time.Second,
+				TimeRange:   backend.TimeRange{From: from, To: from.Add(tc.rangeDuration)},
+				Format:      dataQueryFormatSeries,
+			}
+
+			frame := newFillFrame(from, tc.numValueFields)
+			result := e.applyFill(frame, qm)
+
+			rows, err := result.RowLen()
+			require.NoError(t, err)
+
+			if tc.expFilled {
+				require.Greater(t, rows, 1, "expected the frame to be resampled")
+				if result.Meta != nil {
+					require.Empty(t, result.Meta.Notices)
+				}
+				return
+			}
+
+			require.Equal(t, 1, rows, "expected the original unfilled frame")
+			require.Len(t, result.Meta.Notices, 1)
+			require.Contains(t, result.Meta.Notices[0].Text, "Fill operation skipped")
+			require.Equal(t, data.NoticeSeverityWarning, result.Meta.Notices[0].Severity)
+		})
+	}
+}
+
+func TestMaxFillPoints(t *testing.T) {
+	const rowLimit = int64(1000000)
+
+	testCases := []struct {
+		desc      string
+		numFields int64
+		expPoints int64
+	}{
+		{desc: "single field keeps the full row limit", numFields: 1, expPoints: 1000000},
+		{desc: "a typical panel keeps the full row limit", numFields: 5, expPoints: 1000000},
+		{desc: "the widest free frame keeps the full row limit", numFields: 10, expPoints: 1000000},
+		{desc: "one field past the allowance reduces it slightly", numFields: 11, expPoints: 909090},
+		{desc: "twice the allowance halves it", numFields: 20, expPoints: 500000},
+		{desc: "five times the allowance divides it by five", numFields: 50, expPoints: 200000},
+		{desc: "ten times the allowance divides it by ten", numFields: 100, expPoints: 100000},
+		{desc: "a very wide frame collapses the allowance", numFields: 1001, expPoints: 9990},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := maxFillPoints(rowLimit, tc.numFields)
+			require.Equal(t, tc.expPoints, got)
+
+			// Past the free allowance the resample must never be permitted more
+			// cells than a frame sitting exactly at the allowance would use.
+			require.LessOrEqual(t, got*tc.numFields, rowLimit*fillFreeFields)
+		})
+	}
+}
