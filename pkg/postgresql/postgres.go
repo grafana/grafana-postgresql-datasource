@@ -350,11 +350,7 @@ func (t *postgresQueryResultTransformer) GetConverterList() []sqlutil.StringConv
 // "MaxSize must be >= 1".
 func applyPoolConfig(pgxConf *pgxpool.Config, jsonData sqleng.JsonData) {
 	// ConnMaxLifetime=0 means "no limit" in Grafana's UI: leave MaxConnLifetime
-	// unset so pgxpool keeps connections alive indefinitely. Setting it to 0
-	// explicitly makes pgxpool (v5.10.0) treat every fresh connection as
-	// immediately expired (its isExpired check lacks a maxConnLifetime<=0
-	// guard), so every Acquire retries and ultimately fails with
-	// "pgxpool: too many failed attempts acquiring connection".
+	// unset so pgxpool keeps connections alive indefinitely.
 	if jsonData.ConnMaxLifetime > 0 {
 		pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
 	}
