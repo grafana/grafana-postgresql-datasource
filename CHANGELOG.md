@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.4
+
+- Fix security vulnerabilities (CVE-2026-84445)
+
 ## 13.0.3
 
 - Clear CVEs due in the current SLO window across frontend dependencies ([#169](https://github.com/grafana/grafana-postgresql-datasource/pull/169))
