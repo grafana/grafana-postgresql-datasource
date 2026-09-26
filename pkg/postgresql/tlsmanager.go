@@ -16,6 +16,7 @@ type TLSManager struct {
 
 type tlsSettings struct {
 	Mode                string
+	Negotiation         string
 	ConfigurationMethod string
 	RootCertFile        string
 	CertFile            string
@@ -39,6 +40,7 @@ func (m *TLSManager) getTLSSettings(dsInfo sqleng.DataSourceInfo) (tlsSettings, 
 		return tlsConfig, nil
 	}
 
+	tlsConfig.Negotiation = dsInfo.JsonData.Negotiation
 	tlsConfig.ConfigurationMethod = dsInfo.JsonData.ConfigurationMethod
 	tlsConfig.RootCertFile = dsInfo.JsonData.RootCertFile
 	tlsConfig.CertFile = dsInfo.JsonData.CertFile
