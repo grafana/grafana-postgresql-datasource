@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.5
+
+- Fix security vulnerabilities (CVE-2026-102276, CVE-2026-102278, CVE-2026-102990)
+
 ## 13.0.4
 
 - Fix security vulnerabilities (CVE-2026-84445)
