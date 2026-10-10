@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15@sha256:c961aa287d8698297cb26cdfadfbe9fd2cbaf77e53cfffe9636e8d8a1e4d842c
     environment:
       POSTGRES_DB: testdb
       POSTGRES_USER: grafana
@@ -12,7 +12,7 @@ services:
       retries: 10
 
   fixture-loader:
-    image: postgres:15
+    image: postgres:15@sha256:c961aa287d8698297cb26cdfadfbe9fd2cbaf77e53cfffe9636e8d8a1e4d842c
     depends_on:
       postgres:
         condition: service_healthy
