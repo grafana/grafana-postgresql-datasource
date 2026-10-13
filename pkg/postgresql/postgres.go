@@ -345,11 +345,17 @@ func (t *postgresQueryResultTransformer) GetConverterList() []sqlutil.StringConv
 }
 
 // applyPoolConfig applies pool-related settings from JsonData to pgxConf.
-// MaxOpenConns <= 0 means "use driver default" — leave MaxConns unset so
-// pgxpool uses its own default (max(4, NumCPU)) instead of failing with
-// "MaxSize must be >= 1".
+// A value <= 0 means "use driver default" — leave the field as pgxpool.ParseConfig
+// set it, because the zero value is not a default to pgxpool, it is a setting:
+//   - MaxConns = 0 reaches puddle as MaxSize=0 and fails with "MaxSize must be >= 1".
+//   - MaxConnLifetime = 0 expires every connection the moment it is created. Since
+//     pgx v5.10.0 the lifetime is enforced when a connection is acquired, so each
+//     Acquire destroys the connection it was handed and retries until it gives up
+//     with "too many failed attempts acquiring connection".
 func applyPoolConfig(pgxConf *pgxpool.Config, jsonData sqleng.JsonData) {
-	pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
+	if jsonData.ConnMaxLifetime > 0 {
+		pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
+	}
 	if jsonData.MaxOpenConns > 0 {
 		pgxConf.MaxConns = int32(jsonData.MaxOpenConns)
 	}
