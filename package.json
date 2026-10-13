@@ -92,5 +92,5 @@
   "overrides": {
     "basic-ftp": "^6.2.1"
   },
-  "packageManager": "npm@11.18.0"
+  "packageManager": "npm@12.2.0"
 }
