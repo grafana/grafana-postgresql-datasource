@@ -349,7 +349,11 @@ func (t *postgresQueryResultTransformer) GetConverterList() []sqlutil.StringConv
 // pgxpool uses its own default (max(4, NumCPU)) instead of failing with
 // "MaxSize must be >= 1".
 func applyPoolConfig(pgxConf *pgxpool.Config, jsonData sqleng.JsonData) {
-	pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
+	// ConnMaxLifetime=0 means "no limit" in Grafana's UI: leave MaxConnLifetime
+	// unset so pgxpool keeps connections alive indefinitely.
+	if jsonData.ConnMaxLifetime > 0 {
+		pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
+	}
 	if jsonData.MaxOpenConns > 0 {
 		pgxConf.MaxConns = int32(jsonData.MaxOpenConns)
 	}
