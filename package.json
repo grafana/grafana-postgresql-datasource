@@ -90,7 +90,8 @@
     "uuid": "14.0.1"
   },
   "overrides": {
-    "basic-ftp": "^6.2.1"
+    "basic-ftp": "^6.2.1",
+    "moment": "2.31.0"
   },
   "packageManager": "npm@11.18.0"
 }
