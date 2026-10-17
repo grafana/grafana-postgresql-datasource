@@ -42,6 +42,7 @@ test.describe('Config editor', () => {
       // TLS/SSL Mode label is visible (the Combobox has no inputId so getByRole('combobox') won't
       // match by name — verify the label is present instead).
       await expect(page.getByText('TLS/SSL Mode').first()).toBeVisible();
+      await expect(page.getByText('TLS/SSL Negotiation').first()).toBeVisible();
     });
   });
 
