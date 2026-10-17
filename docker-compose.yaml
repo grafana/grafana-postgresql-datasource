@@ -33,14 +33,55 @@ services:
     environment:
       REQUIRE_AUTH: "false"
 
+  # PostgreSQL 17 is the first version that accepts direct TLS (sslnegotiation=direct).
+  # The certificate is self-signed and generated at startup.
+  postgres-tls:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: grafana
+      POSTGRES_PASSWORD: grafana
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        set -e;
+        openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=sni-proxy
+        -keyout /tmp/server.key -out /tmp/server.crt;
+        chown postgres:postgres /tmp/server.key /tmp/server.crt;
+        exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grafana -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # TLS-passthrough proxy that routes only by the SNI in the TLS ClientHello, so it
+  # accepts direct TLS and closes connections that start with a plain-text SSLRequest.
+  sni-proxy:
+    image: nginx:1.31-alpine
+    depends_on:
+      postgres-tls:
+        condition: service_healthy
+    volumes:
+      - ./tests/e2e/sni-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+
   grafana:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    # Grafana before 13.2.0 ships a core plugin with this ID. as_external makes it load this build instead.
+    # GF_* variables only override keys that already exist in an ini file, so append the section.
+    entrypoint:
+      - bash
+      - -c
+      - printf '\n[plugin.grafana-postgresql-datasource]\nas_external = true\n' >> /etc/grafana/grafana.ini && exec /entrypoint.sh
     depends_on:
       fixture-loader:
         condition: service_completed_successfully
       microsocks:
+        condition: service_started
+      sni-proxy:
         condition: service_started
     environment:
       # Grafana 13 enabled splashScreen by default; it renders as an overlay that
