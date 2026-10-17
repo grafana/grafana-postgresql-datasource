@@ -38,3 +38,59 @@ datasources:
       enableSecureSocksProxy: true
     secureJsonData:
       password: "${DS_INSTANCE_PASSWORD}"
+
+  # PostgreSQL 17 behind docker-compose.yaml's sni-proxy service, which accepts only direct TLS.
+  # Local-only fixtures for tests/directTls.spec.ts.
+  - name: postgresql-direct-tls
+    type: grafana-postgresql-datasource
+    uid: postgresql-direct-tls-e2e
+    access: proxy
+    isDefault: false
+    orgId: 1
+    version: 1
+    editable: true
+    url: sni-proxy:5432
+    user: grafana
+    jsonData:
+      database: testdb
+      sslmode: require
+      sslNegotiation: direct
+      postgresVersion: 1500
+    secureJsonData:
+      password: grafana
+
+  - name: postgresql-direct-tls-socks-proxy
+    type: grafana-postgresql-datasource
+    uid: postgresql-direct-tls-socks-proxy-e2e
+    access: proxy
+    isDefault: false
+    orgId: 1
+    version: 1
+    editable: true
+    url: sni-proxy:5432
+    user: grafana
+    jsonData:
+      database: testdb
+      sslmode: require
+      sslNegotiation: direct
+      postgresVersion: 1500
+      enableSecureSocksProxy: true
+    secureJsonData:
+      password: grafana
+
+  - name: postgresql-sni-proxy-postgres-negotiation
+    type: grafana-postgresql-datasource
+    uid: postgresql-sni-postgres-negotiation-e2e
+    access: proxy
+    isDefault: false
+    orgId: 1
+    version: 1
+    editable: true
+    url: sni-proxy:5432
+    user: grafana
+    jsonData:
+      database: testdb
+      sslmode: require
+      postgresVersion: 1500
+    secureJsonData:
+      password: grafana
