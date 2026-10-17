@@ -69,6 +69,14 @@ npm run server
 npm run e2e
 ```
 
+Grafana versions before 13.2.0 serve their own core PostgreSQL plugin instead of this build. To test this build locally, start the server with Grafana 13.2.0 or later:
+
+```shell
+GRAFANA_VERSION=13.2.4 npm run server
+```
+
+Tests for behavior that only this build has must skip when `servesCorePlugin(grafanaVersion)` from `tests/pluginBuild.ts` returns `true`.
+
 Or, to install Playwright browsers first:
 
 ```shell
