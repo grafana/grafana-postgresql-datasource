@@ -71,11 +71,10 @@ services:
       file: .config/docker-compose-base.yaml
       service: grafana
     # Grafana before 13.2.0 ships a core plugin with this ID. as_external makes it load this build instead.
-    # GF_* variables only override keys that already exist in an ini file, so append the section.
-    entrypoint:
-      - bash
-      - -c
-      - printf '\n[plugin.grafana-postgresql-datasource]\nas_external = true\n' >> /etc/grafana/grafana.ini && exec /entrypoint.sh
+    # GF_* variables only override keys that already exist in an ini file, so mount one with the section.
+    configs:
+      - source: grafana_ini
+        target: /etc/grafana/grafana.ini
     depends_on:
       fixture-loader:
         condition: service_completed_successfully
@@ -97,3 +96,9 @@ services:
       GF_SECURE_SOCKS_DATASOURCE_PROXY_ENABLED: "true"
       GF_SECURE_SOCKS_DATASOURCE_PROXY_PROXY_ADDRESS: microsocks:1080
       GF_SECURE_SOCKS_DATASOURCE_PROXY_ALLOW_INSECURE: "true"
+
+configs:
+  grafana_ini:
+    content: |
+      [plugin.grafana-postgresql-datasource]
+      as_external = true
