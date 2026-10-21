@@ -348,6 +348,7 @@ func (t *postgresQueryResultTransformer) GetConverterList() []sqlutil.StringConv
 // MaxOpenConns <= 0 means "use driver default" — leave MaxConns unset so
 // pgxpool uses its own default (max(4, NumCPU)) instead of failing with
 // "MaxSize must be >= 1".
+// ConnMaxLifetime <= 0 means no limit, which pgxpool applies to a non-positive MaxConnLifetime.
 func applyPoolConfig(pgxConf *pgxpool.Config, jsonData sqleng.JsonData) {
 	pgxConf.MaxConnLifetime = time.Duration(jsonData.ConnMaxLifetime) * time.Second
 	if jsonData.MaxOpenConns > 0 {
