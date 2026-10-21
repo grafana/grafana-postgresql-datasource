@@ -44,6 +44,16 @@ func TestGetTLSSettings(t *testing.T) {
 			tlsSettings: tlsSettings{Mode: "disable"},
 		},
 		{
+			desc:        "Direct TLS negotiation with TLS disabled",
+			jsonData:    sqleng.JsonData{Mode: "disable", SSLNegotiation: "direct"},
+			tlsSettings: tlsSettings{Mode: "disable"},
+		},
+		{
+			desc:        "Direct TLS negotiation",
+			jsonData:    sqleng.JsonData{Mode: "require", SSLNegotiation: "direct"},
+			tlsSettings: tlsSettings{Mode: "require", Negotiation: "direct"},
+		},
+		{
 			desc:    "Custom TLS authentication with file path",
 			updated: updatedTime.Add(time.Minute),
 			jsonData: sqleng.JsonData{
