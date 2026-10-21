@@ -63,6 +63,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      golangci-lint-version: '2.15.0'
       grafana-image: ${{ inputs.grafana-image }}
       push-image: ${{ inputs.push-image }}
       trigger-argo: ${{ inputs.trigger-argo }}
