@@ -1,5 +1,4 @@
-import { type Observable, of } from 'rxjs';
-import { TestScheduler } from 'rxjs/testing';
+import { lastValueFrom, type Observable, of, toArray } from 'rxjs';
 
 import {
   getDefaultTimeRange,
@@ -76,29 +75,17 @@ describe('PostgreSQLDatasource', () => {
     return { ds, variable };
   };
 
-  // https://rxjs-dev.firebaseapp.com/guide/testing/marble-testing
-  const runMarbleTest = (args: {
+  // DataSourceWithBackend.query builds its request asynchronously, so marble (virtual time) testing cannot observe it
+  const runQueryTest = async (args: {
     options: DataQueryRequest<SQLQuery>;
-    values: { [marble: string]: FetchResponse };
-    marble: string;
-    expectedValues: { [marble: string]: DataQueryResponse };
-    expectedMarble: string;
+    response: FetchResponse;
+    expected: DataQueryResponse;
   }) => {
-    const { expectedValues, expectedMarble, options, values, marble } = args;
-    const scheduler: TestScheduler = new TestScheduler((actual, expected) => {
-      expect(actual).toEqual(expected);
-    });
-
     const { ds } = setupTestContext({});
+    fetchMock.mockImplementation(() => of(args.response));
 
-    scheduler.run(({ cold, expectObservable }) => {
-      const source = cold(marble, values);
-      jest.clearAllMocks();
-      fetchMock.mockImplementation(() => source);
-
-      const result = ds.query(options);
-      expectObservable(result).toBe(expectedMarble, expectedValues);
-    });
+    const actual = await lastValueFrom(ds.query(args.options).pipe(toArray()));
+    expect(actual).toEqual([args.expected]);
   };
 
   const simpleTemplateSrv = {
@@ -106,7 +93,7 @@ describe('PostgreSQLDatasource', () => {
   };
 
   describe('When performing a time series query', () => {
-    it('should transform response correctly', () => {
+    it('should transform response correctly', async () => {
       const options: DataQueryRequest<SQLQuery> = {
         range: {
           from: dateTime(1432288354),
@@ -155,8 +142,6 @@ describe('PostgreSQLDatasource', () => {
       };
 
       const values = { a: createFetchResponse(response) };
-      const marble = '-a|';
-      const expectedMarble = '-a|';
       const expectedValues: { a: DataQueryResponse } = {
         a: {
           data: [
@@ -192,12 +177,12 @@ describe('PostgreSQLDatasource', () => {
         },
       };
 
-      runMarbleTest({ options, marble, values, expectedMarble, expectedValues });
+      await runQueryTest({ options, response: values.a, expected: expectedValues.a });
     });
   });
 
   describe('When performing a table query', () => {
-    it('should transform response correctly', () => {
+    it('should transform response correctly', async () => {
       const options: DataQueryRequest<SQLQuery> = {
         range: {
           from: dateTime(1432288354),
@@ -247,8 +232,6 @@ describe('PostgreSQLDatasource', () => {
       };
 
       const values = { a: createFetchResponse(response) };
-      const marble = '-a|';
-      const expectedMarble = '-a|';
       const expectedValues: { a: DataQueryResponse } = {
         a: {
           data: [
@@ -288,7 +271,7 @@ describe('PostgreSQLDatasource', () => {
         },
       };
 
-      runMarbleTest({ options, marble, values, expectedMarble, expectedValues });
+      await runQueryTest({ options, response: values.a, expected: expectedValues.a });
     });
   });
 
