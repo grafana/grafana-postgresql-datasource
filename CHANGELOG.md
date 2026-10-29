@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.7
+
+- Update backend dependencies
+
 ## 13.0.6
 
 - Fix security vulnerabilities in frontend and Go dependencies ([#178](https://github.com/grafana/grafana-postgresql-datasource/pull/178))
