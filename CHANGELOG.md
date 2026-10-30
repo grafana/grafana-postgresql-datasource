@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix a connection freeze between Grafana and the plugin under heavy query load by updating google.golang.org/grpc to v1.85.0 ([grpc/grpc-go#9330](https://github.com/grpc/grpc-go/issues/9330))
+
 ## 13.0.6
 
 - Fix security vulnerabilities in frontend and Go dependencies ([#178](https://github.com/grafana/grafana-postgresql-datasource/pull/178))
