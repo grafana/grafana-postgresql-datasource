@@ -64,6 +64,31 @@ test.describe('Config editor', () => {
     });
   });
 
+  test.describe('response size limit', () => {
+    test('should render Response size limit field', async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+
+      await expect(page.getByText('Response size limit')).toBeVisible();
+      // No inputId on this Input, same as other fields in this file - getByPlaceholder
+      // is the only reliable way to locate it (see the comment on the provisioned-datasource
+      // test above). exact:true is required here - getByPlaceholder does substring
+      // matching by default, and "0" would also match the neighboring "100"/"14400" fields.
+      await expect(page.getByPlaceholder('0', { exact: true })).toBeVisible();
+    });
+
+    test('should save and reload the configured limit', async ({ createDataSourceConfigPage, page }) => {
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+      await page.getByPlaceholder('localhost:5432').fill('localhost:5432');
+      await page.getByPlaceholder('0', { exact: true }).fill('5000000');
+
+      await configPage.mockHealthCheckResponse({ status: 'OK' }, 200);
+      await expect(configPage.saveAndTest()).toBeOK();
+
+      await configPage.goto();
+      await expect(page.getByPlaceholder('0', { exact: true })).toHaveValue('5000000');
+    });
+  });
+
   test.describe('save & test', () => {
     test('should pass health check for provisioned datasource', async ({
       readProvisionedDataSource,
