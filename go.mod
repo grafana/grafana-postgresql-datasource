@@ -3,10 +3,11 @@ module github.com/grafana/grafana-postgresql-datasource
 go 1.27.3
 
 require (
-	github.com/grafana/grafana-plugin-sdk-go v0.297.0
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/grafana/grafana-plugin-sdk-go v0.298.0
+	github.com/jackc/pgx/v5 v5.12.0
+	github.com/magefile/mage v1.17.2
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 )
 
 require (
@@ -46,7 +47,6 @@ require (
 	github.com/jszwedko/go-datemath v0.1.1-0.20260113213115-7f666eef0523 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.1 // indirect
-	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
