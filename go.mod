@@ -3,14 +3,16 @@ module github.com/grafana/grafana-postgresql-datasource
 go 1.27.3
 
 require (
-	github.com/grafana/grafana-plugin-sdk-go v0.297.0
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/grafana/grafana-plugin-sdk-go v0.298.0
+	github.com/jackc/pgx/v5 v5.12.0
+	github.com/magefile/mage v1.17.2
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/apache/arrow-go/v18 v18.8.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -45,7 +47,6 @@ require (
 	github.com/jszwedko/go-datemath v0.1.1-0.20260113213115-7f666eef0523 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.1 // indirect
-	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -90,7 +91,7 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/grpc v1.85.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
 )
