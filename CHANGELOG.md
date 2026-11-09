@@ -1,5 +1,24 @@
 # Changelog
 
+## 13.0.7
+
+- Update backend dependencies
+- Fix a connection freeze between Grafana and the plugin under heavy query load by updating google.golang.org/grpc to v1.85.0 ([grpc/grpc-go#9330](https://github.com/grpc/grpc-go/issues/9330))
+
+## 13.0.6
+
+- Fix security vulnerabilities in frontend and Go dependencies ([#178](https://github.com/grafana/grafana-postgresql-datasource/pull/178))
+- Update Go to 1.27.3 ([#183](https://github.com/grafana/grafana-postgresql-datasource/pull/183))
+- Pin golangci-lint to 2.15.0 across CI and release workflows ([#184](https://github.com/grafana/grafana-postgresql-datasource/pull/184))
+
+## 13.0.5
+
+- Fix security vulnerabilities (CVE-2026-102276, CVE-2026-102278, CVE-2026-102990)
+
+## 13.0.4
+
+- Fix security vulnerabilities (CVE-2026-84445)
+
 ## 13.0.3
 
 - Clear CVEs due in the current SLO window across frontend dependencies ([#169](https://github.com/grafana/grafana-postgresql-datasource/pull/169))
