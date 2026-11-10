@@ -93,5 +93,5 @@
     "basic-ftp": "6.2.6",
     "moment": "2.31.0"
   },
-  "packageManager": "npm@11.21.2"
+  "packageManager": "npm@12.2.2"
 }
