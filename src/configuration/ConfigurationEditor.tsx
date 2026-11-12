@@ -460,8 +460,8 @@ export const PostgresConfigEditor = (props: DataSourcePluginOptionsEditorProps<P
                         content={
                           <span>
                             Maximum total size, in bytes, of a single query&apos;s result set. When the limit is reached
-                            the query stops and the partial result is returned with a warning. Leave empty or set to{' '}
-                            <code>0</code> to disable.
+                            the remaining rows are discarded and the partial result is returned with a warning. This
+                            caps memory use, not query time. Leave empty or set to <code>0</code> to disable.
                           </span>
                         }
                       >

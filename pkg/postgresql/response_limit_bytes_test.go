@@ -18,6 +18,10 @@ import (
 func TestIntegrationResponseLimitBytes(t *testing.T) {
 	skipIntegrationTestInShortMode(t)
 
+	if !isTestDbPostgres() {
+		t.Skip()
+	}
+
 	origInterpolate := sqleng.Interpolate
 	t.Cleanup(func() { sqleng.Interpolate = origInterpolate })
 	sqleng.Interpolate = func(query backend.DataQuery, timeRange backend.TimeRange, timeInterval string, sql string) string {
