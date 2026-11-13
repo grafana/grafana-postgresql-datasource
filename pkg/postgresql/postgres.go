@@ -238,6 +238,10 @@ func generateConnectionString(dsInfo sqleng.DataSourceInfo, tlsSettings tlsSetti
 
 	connStr += fmt.Sprintf(" sslmode='%s'", escape(tlsSettings.Mode))
 
+	if tlsSettings.Negotiation == "direct" {
+		connStr += " sslnegotiation='direct'"
+	}
+
 	// Attach root certificate if provided
 	if tlsSettings.RootCertFile != "" {
 		logger.Debug("Setting server root certificate", "tlsRootCert", tlsSettings.RootCertFile)
