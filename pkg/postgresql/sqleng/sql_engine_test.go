@@ -427,267 +427,244 @@ func TestSQLEngine(t *testing.T) {
 	})
 }
 
-func TestConvertResultsToFrame(t *testing.T) {
-	// Import the pgx packages needed for testing
-	// These imports are included in the main file but need to be accessible for tests
-	t.Run("convertResultsToFrame with single result", func(t *testing.T) {
-		// Create mock field descriptions
+// buildFrame replays already-materialised results through the streaming
+// frameBuilder - the same code path queryToDataFrame drives off a live
+// connection - so the frame-assembly logic can be tested without a database.
+func buildFrame(t *testing.T, results []*pgconn.Result, rowLimit, byteLimit int64) (*data.Frame, error) {
+	t.Helper()
+	fb := newFrameBuilder(rowLimit, byteLimit)
+	for _, result := range results {
+		if err := fb.startResult(result.FieldDescriptions); err != nil {
+			return nil, err
+		}
+		if len(result.FieldDescriptions) == 0 {
+			continue
+		}
+		stopped := false
+		for _, row := range result.Rows {
+			stop, err := fb.appendRow(result.FieldDescriptions, row)
+			if err != nil {
+				return nil, err
+			}
+			if stop {
+				stopped = true
+				break
+			}
+		}
+		if stopped {
+			break
+		}
+	}
+	return fb.frame(), nil
+}
+
+func TestFrameBuilder(t *testing.T) {
+	t.Run("single result", func(t *testing.T) {
 		fieldDescs := []pgconn.FieldDescription{
 			{Name: "id", DataTypeOID: pgtype.Int4OID},
 			{Name: "name", DataTypeOID: pgtype.TextOID},
 			{Name: "value", DataTypeOID: pgtype.Float8OID},
 		}
-
-		// Create mock result data
 		mockRows := [][][]byte{
 			{[]byte("1"), []byte("test1"), []byte("10.5")},
 			{[]byte("2"), []byte("test2"), []byte("20.7")},
 		}
-
-		// Create mock result
-		result := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows,
-		}
+		result := &pgconn.Result{FieldDescriptions: fieldDescs, Rows: mockRows}
 		result.CommandTag = pgconn.NewCommandTag("SELECT 2")
 
-		results := []*pgconn.Result{result}
-
-		frame, err := convertResultsToFrame(results, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 1000, 0)
 		require.NoError(t, err)
 		require.NotNil(t, frame)
 		require.Equal(t, 3, len(frame.Fields))
 		require.Equal(t, 2, frame.Rows())
-
-		// Verify field names
 		require.Equal(t, "id", frame.Fields[0].Name)
 		require.Equal(t, "name", frame.Fields[1].Name)
 		require.Equal(t, "value", frame.Fields[2].Name)
 	})
 
-	t.Run("convertResultsToFrame with multiple compatible results", func(t *testing.T) {
-		// Create mock field descriptions (same structure for both results)
+	t.Run("multiple compatible results", func(t *testing.T) {
 		fieldDescs := []pgconn.FieldDescription{
 			{Name: "id", DataTypeOID: pgtype.Int4OID},
 			{Name: "name", DataTypeOID: pgtype.TextOID},
 		}
-
-		// Create first result
-		mockRows1 := [][][]byte{
+		result1 := &pgconn.Result{FieldDescriptions: fieldDescs, Rows: [][][]byte{
 			{[]byte("1"), []byte("test1")},
 			{[]byte("2"), []byte("test2")},
-		}
-		result1 := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows1,
-		}
+		}}
 		result1.CommandTag = pgconn.NewCommandTag("SELECT 2")
-
-		// Create second result with same structure
-		mockRows2 := [][][]byte{
+		result2 := &pgconn.Result{FieldDescriptions: fieldDescs, Rows: [][][]byte{
 			{[]byte("3"), []byte("test3")},
 			{[]byte("4"), []byte("test4")},
-		}
-		result2 := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows2,
-		}
+		}}
 		result2.CommandTag = pgconn.NewCommandTag("SELECT 2")
 
-		results := []*pgconn.Result{result1, result2}
-
-		frame, err := convertResultsToFrame(results, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{result1, result2}, 1000, 0)
 		require.NoError(t, err)
 		require.NotNil(t, frame)
 		require.Equal(t, 2, len(frame.Fields))
-		require.Equal(t, 4, frame.Rows()) // Should have rows from both results
-
-		// Verify field names
+		require.Equal(t, 4, frame.Rows()) // rows from both results
 		require.Equal(t, "id", frame.Fields[0].Name)
 		require.Equal(t, "name", frame.Fields[1].Name)
 	})
 
-	t.Run("convertResultsToFrame with row limit", func(t *testing.T) {
-		// Create mock field descriptions
-		fieldDescs := []pgconn.FieldDescription{
+	t.Run("incompatible later result is rejected", func(t *testing.T) {
+		result1 := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
 			{Name: "id", DataTypeOID: pgtype.Int4OID},
-		}
+		}, Rows: [][][]byte{{[]byte("1")}}}
+		result2 := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
+			{Name: "other", DataTypeOID: pgtype.Int4OID},
+		}, Rows: [][][]byte{{[]byte("2")}}}
 
-		// Create mock result data with 3 rows
-		mockRows := [][][]byte{
-			{[]byte("1")},
-			{[]byte("2")},
-			{[]byte("3")},
-		}
+		_, err := buildFrame(t, []*pgconn.Result{result1, result2}, 1000, 0)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "column name mismatch")
+	})
 
-		result := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows,
-		}
+	t.Run("row limit truncates and adds a notice", func(t *testing.T) {
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
+			{Name: "id", DataTypeOID: pgtype.Int4OID},
+		}, Rows: [][][]byte{{[]byte("1")}, {[]byte("2")}, {[]byte("3")}}}
 		result.CommandTag = pgconn.NewCommandTag("SELECT 3")
 
-		results := []*pgconn.Result{result}
-
-		// Set row limit to 2
-		frame, err := convertResultsToFrame(results, 2)
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 2, 0)
 		require.NoError(t, err)
-		require.NotNil(t, frame)
-		require.Equal(t, 1, len(frame.Fields))
-		require.Equal(t, 2, frame.Rows()) // Should be limited to 2 rows
-
-		// Should have a notice about the limit
+		require.Equal(t, 2, frame.Rows())
 		require.NotNil(t, frame.Meta)
 		require.Len(t, frame.Meta.Notices, 1)
 		require.Contains(t, frame.Meta.Notices[0].Text, "Results have been limited to 2")
 	})
 
-	t.Run("convertResultsToFrame with mixed SELECT and non-SELECT results", func(t *testing.T) {
-		// Create a non-SELECT result (should be skipped)
-		nonSelectResult := &pgconn.Result{}
-		nonSelectResult.CommandTag = pgconn.NewCommandTag("UPDATE 1")
+	t.Run("row limit is cumulative across results", func(t *testing.T) {
+		// A limit of 2 caps the whole frame, not each result separately, and it
+		// stops processing entirely rather than truncating result-by-result.
+		fieldDescs := []pgconn.FieldDescription{{Name: "id", DataTypeOID: pgtype.Int4OID}}
+		result1 := &pgconn.Result{FieldDescriptions: fieldDescs, Rows: [][][]byte{
+			{[]byte("1")}, {[]byte("2")}, {[]byte("3")},
+		}}
+		result2 := &pgconn.Result{FieldDescriptions: fieldDescs, Rows: [][][]byte{
+			{[]byte("4")}, {[]byte("5")}, {[]byte("6")},
+		}}
 
-		// Create a SELECT result
-		fieldDescs := []pgconn.FieldDescription{
+		frame, err := buildFrame(t, []*pgconn.Result{result1, result2}, 2, 0)
+		require.NoError(t, err)
+		require.Equal(t, 2, frame.Rows())
+		require.NotNil(t, frame.Meta)
+		require.Len(t, frame.Meta.Notices, 1)
+		require.Contains(t, frame.Meta.Notices[0].Text, "Results have been limited to 2")
+	})
+
+	t.Run("response byte limit truncates and adds a notice", func(t *testing.T) {
+		// Each row's single value is 10 bytes; a 25-byte limit is reached after
+		// the third row (30 >= 25).
+		rows := make([][][]byte, 0, 5)
+		for i := 0; i < 5; i++ {
+			rows = append(rows, [][]byte{[]byte("0123456789")})
+		}
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
+			{Name: "s", DataTypeOID: pgtype.TextOID},
+		}, Rows: rows}
+
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 1000, 25)
+		require.NoError(t, err)
+		require.Equal(t, 3, frame.Rows())
+		require.NotNil(t, frame.Meta)
+		require.Len(t, frame.Meta.Notices, 1)
+		require.Contains(t, frame.Meta.Notices[0].Text, "response size limit of 25 bytes")
+	})
+
+	t.Run("byte limit of zero is disabled", func(t *testing.T) {
+		rows := make([][][]byte, 0, 100)
+		for i := 0; i < 100; i++ {
+			rows = append(rows, [][]byte{[]byte("0123456789")})
+		}
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
+			{Name: "s", DataTypeOID: pgtype.TextOID},
+		}, Rows: rows}
+
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 100, frame.Rows())
+		require.Nil(t, frame.Meta)
+	})
+
+	t.Run("row limit wins when it is reached first", func(t *testing.T) {
+		rows := make([][][]byte, 0, 10)
+		for i := 0; i < 10; i++ {
+			rows = append(rows, [][]byte{[]byte("0123456789")})
+		}
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
+			{Name: "s", DataTypeOID: pgtype.TextOID},
+		}, Rows: rows}
+
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 2, 10_000)
+		require.NoError(t, err)
+		require.Equal(t, 2, frame.Rows())
+		require.Len(t, frame.Meta.Notices, 1)
+		require.Contains(t, frame.Meta.Notices[0].Text, "SQL row limit")
+	})
+
+	t.Run("mixed SELECT and non-SELECT results", func(t *testing.T) {
+		nonSelect := &pgconn.Result{}
+		nonSelect.CommandTag = pgconn.NewCommandTag("UPDATE 1")
+		selectResult := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
 			{Name: "id", DataTypeOID: pgtype.Int4OID},
-		}
-		mockRows := [][][]byte{
-			{[]byte("1")},
-		}
-		selectResult := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows,
-		}
+		}, Rows: [][][]byte{{[]byte("1")}}}
 		selectResult.CommandTag = pgconn.NewCommandTag("SELECT 1")
 
-		results := []*pgconn.Result{nonSelectResult, selectResult}
-
-		frame, err := convertResultsToFrame(results, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{nonSelect, selectResult}, 1000, 0)
 		require.NoError(t, err)
-		require.NotNil(t, frame)
 		require.Equal(t, 1, len(frame.Fields))
 		require.Equal(t, 1, frame.Rows())
 	})
 
-	t.Run("convertResultsToFrame with no row-returning results", func(t *testing.T) {
-		// UPDATE and INSERT have no FieldDescriptions, so should return an empty frame
+	t.Run("no row-returning results yields an empty frame", func(t *testing.T) {
 		result1 := &pgconn.Result{}
 		result1.CommandTag = pgconn.NewCommandTag("UPDATE 1")
-
 		result2 := &pgconn.Result{}
 		result2.CommandTag = pgconn.NewCommandTag("INSERT 1")
 
-		results := []*pgconn.Result{result1, result2}
-
-		frame, err := convertResultsToFrame(results, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{result1, result2}, 1000, 0)
 		require.NoError(t, err)
 		require.NotNil(t, frame)
 		require.Equal(t, 0, len(frame.Fields))
 		require.Equal(t, 0, frame.Rows())
 	})
 
-	t.Run("convertResultsToFrame with EXPLAIN ANALYZE result", func(t *testing.T) {
-		// EXPLAIN ANALYZE returns rows with a non-SELECT command tag ("EXPLAIN"),
-		// but has FieldDescriptions and should not be filtered out.
-		fieldDescs := []pgconn.FieldDescription{
+	t.Run("EXPLAIN ANALYZE result is not filtered out", func(t *testing.T) {
+		// EXPLAIN ANALYZE returns rows with a non-SELECT command tag ("EXPLAIN").
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
 			{Name: "QUERY PLAN", DataTypeOID: pgtype.TextOID},
-		}
-		mockRows := [][][]byte{
+		}, Rows: [][][]byte{
 			{[]byte("Seq Scan on t  (cost=0.00..1.01 rows=1 width=4) (actual time=0.010..0.011 rows=1 loops=1)")},
 			{[]byte("Planning Time: 0.1 ms")},
 			{[]byte("Execution Time: 0.2 ms")},
-		}
-		result := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows,
-		}
+		}}
 		result.CommandTag = pgconn.NewCommandTag("EXPLAIN")
 
-		frame, err := convertResultsToFrame([]*pgconn.Result{result}, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 1000, 0)
 		require.NoError(t, err)
-		require.NotNil(t, frame)
 		require.Equal(t, 1, len(frame.Fields))
 		require.Equal(t, "QUERY PLAN", frame.Fields[0].Name)
 		require.Equal(t, 3, frame.Rows())
 	})
 
-	t.Run("convertResultsToFrame with multiple results and row limit per result", func(t *testing.T) {
-		// Create mock field descriptions (same structure for both results)
-		fieldDescs := []pgconn.FieldDescription{
-			{Name: "id", DataTypeOID: pgtype.Int4OID},
-		}
-
-		// Create first result with 3 rows
-		mockRows1 := [][][]byte{
-			{[]byte("1")},
-			{[]byte("2")},
-			{[]byte("3")},
-		}
-		result1 := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows1,
-		}
-		result1.CommandTag = pgconn.NewCommandTag("SELECT 3")
-
-		// Create second result with 3 rows
-		mockRows2 := [][][]byte{
-			{[]byte("4")},
-			{[]byte("5")},
-			{[]byte("6")},
-		}
-		result2 := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows2,
-		}
-		result2.CommandTag = pgconn.NewCommandTag("SELECT 3")
-
-		results := []*pgconn.Result{result1, result2}
-
-		// Set row limit to 2 (should limit each result to 2 rows)
-		frame, err := convertResultsToFrame(results, 2)
-		require.NoError(t, err)
-		require.NotNil(t, frame)
-		require.Equal(t, 1, len(frame.Fields))
-		require.Equal(t, 4, frame.Rows()) // 2 rows from each result
-
-		// Should have notices about the limit from both results
-		require.NotNil(t, frame.Meta)
-		require.Len(t, frame.Meta.Notices, 2)
-		require.Contains(t, frame.Meta.Notices[0].Text, "Results have been limited to 2")
-		require.Contains(t, frame.Meta.Notices[1].Text, "Results have been limited to 2")
-	})
-
-	t.Run("convertResultsToFrame handles null values correctly", func(t *testing.T) {
-		// Create mock field descriptions
-		fieldDescs := []pgconn.FieldDescription{
+	t.Run("null values are handled", func(t *testing.T) {
+		result := &pgconn.Result{FieldDescriptions: []pgconn.FieldDescription{
 			{Name: "id", DataTypeOID: pgtype.Int4OID},
 			{Name: "name", DataTypeOID: pgtype.TextOID},
-		}
-
-		// Create mock result data with null values
-		mockRows := [][][]byte{
+		}, Rows: [][][]byte{
 			{[]byte("1"), nil},     // null name
 			{nil, []byte("test2")}, // null id
-		}
-
-		result := &pgconn.Result{
-			FieldDescriptions: fieldDescs,
-			Rows:              mockRows,
-		}
+		}}
 		result.CommandTag = pgconn.NewCommandTag("SELECT 2")
 
-		results := []*pgconn.Result{result}
-
-		frame, err := convertResultsToFrame(results, 1000)
+		frame, err := buildFrame(t, []*pgconn.Result{result}, 1000, 0)
 		require.NoError(t, err)
-		require.NotNil(t, frame)
 		require.Equal(t, 2, len(frame.Fields))
 		require.Equal(t, 2, frame.Rows())
-
-		// Check that null values are handled correctly
-		// The exact representation depends on the field type, but should not panic
 		require.NotPanics(t, func() {
-			frame.Fields[0].At(1) // null id
-			frame.Fields[1].At(0) // null name
+			frame.Fields[0].At(1)
+			frame.Fields[1].At(0)
 		})
 	})
 }
