@@ -46,6 +46,10 @@ services:
       # Grafana 13 enabled splashScreen by default; it renders as an overlay that
       # blocks all Playwright interactions. Suppress it unconditionally.
       GF_FEATURE_TOGGLES_splashScreen: "false"
+      # Grafana exits if data source provisioning still gets SQLITE_BUSY after its retries (5, 10 ms apart, before 13.1).
+      # WAL reduces lock contention, and more retries cover the rest on a busy CI runner.
+      GF_DATABASE_WAL: "true"
+      GF_DATABASE_TRANSACTION_RETRIES: "30"
       # Provisioning env vars — override at runtime for Cloud E2E (DS_INSTANCE_* from Vault).
       DS_INSTANCE_HOST: postgres
       DS_INSTANCE_PORT: "5432"
