@@ -113,6 +113,7 @@ test.describe('Direct TLS/SSL negotiation through an SNI-routing proxy', () => {
     const configPage = await gotoDataSourceConfigPage(ds.uid);
 
     await page.getByRole('button', { name: /save.*test/i }).click();
-    await expect(configPage).toHaveAlert('error');
+    // The proxy closes the connection on the SSLRequest with either a FIN or a RST.
+    await expect(configPage).toHaveAlert('error', { hasText: /tls error: EOF|connection reset by peer/ });
   });
 });
