@@ -54,6 +54,16 @@ func TestGetTLSSettings(t *testing.T) {
 			tlsSettings: tlsSettings{Mode: "require", Negotiation: "direct"},
 		},
 		{
+			desc:        "Postgres TLS negotiation",
+			jsonData:    sqleng.JsonData{Mode: "require", SSLNegotiation: "postgres"},
+			tlsSettings: tlsSettings{Mode: "require", Negotiation: "postgres"},
+		},
+		{
+			desc:     "Unknown TLS negotiation",
+			jsonData: sqleng.JsonData{Mode: "require", SSLNegotiation: "Direct"},
+			expErr:   `invalid sslNegotiation "Direct"`,
+		},
+		{
 			desc:    "Custom TLS authentication with file path",
 			updated: updatedTime.Add(time.Minute),
 			jsonData: sqleng.JsonData{

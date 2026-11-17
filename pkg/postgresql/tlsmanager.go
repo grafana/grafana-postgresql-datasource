@@ -40,6 +40,10 @@ func (m *TLSManager) getTLSSettings(dsInfo sqleng.DataSourceInfo) (tlsSettings, 
 		return tlsConfig, nil
 	}
 
+	if n := dsInfo.JsonData.SSLNegotiation; n != "" && n != "postgres" && n != "direct" {
+		return tlsConfig, fmt.Errorf("invalid sslNegotiation %q: must be postgres or direct", n)
+	}
+
 	tlsConfig.Negotiation = dsInfo.JsonData.SSLNegotiation
 	tlsConfig.ConfigurationMethod = dsInfo.JsonData.ConfigurationMethod
 	tlsConfig.RootCertFile = dsInfo.JsonData.RootCertFile
