@@ -1,33 +1,58 @@
-name: Plugins - CI
+name: Plugins - CI/CD
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  push:
+    branches: [main]
 
 permissions: {}
+
+concurrency:
+  # A main run can be publishing to the dev catalog or cutting a release, so it is never cancelled.
+  group: plugins-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
     name: CI
+    # Called directly, because through datasource-cicd.yml the checks report as "CI/CD / CI / <job>"
+    # and the rulesets require "CI / <job>".
+    if: github.event_name == 'pull_request'
     uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v12.1.1
     permissions:
       contents: read
       id-token: write
     with:
       golangci-lint-version: '2.15.0'
-      plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+      plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
       run-playwright: true
 
-  publish-and-deploy:
+  cicd:
+    name: CI/CD
     if: github.ref == 'refs/heads/main'
-    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
+    uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-cicd.yml@main # zizmor: ignore[unpinned-uses]
+    # A ceiling for the called workflow. Each job there declares its own permissions.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    secrets: inherit
+    with:
+      golangci-lint-version: '2.15.0'
+
+  publish-dev:
+    name: Publish to Dev Catalog and Deploy
+    needs: cicd
+    # A direct cd-dev.yml call keeps the reusable-workflow chain inside GitHub's 4-level nesting cap.
+    # A release-please merge is skipped, because cicd publishes that version to prod.
+    if: github.ref == 'refs/heads/main' && needs.cicd.outputs.release_created != 'true'
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main # zizmor: ignore[unpinned-uses]
     permissions:
       attestations: write
       contents: write
       id-token: write
       pull-requests: read
     with:
-      go-version: "1.27.3"
-      golangci-lint-version: "2.15.0"
+      go-version: '1.27.3'
+      golangci-lint-version: '2.15.0'

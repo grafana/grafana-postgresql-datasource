@@ -1,7 +1,9 @@
-name: Plugins - CD
-run-name: Deploy ${{ inputs.branch }} to ${{ inputs.environment }} by @${{ github.actor }}
+name: Plugins - Publish plugin
+run-name: Publish ${{ inputs.branch }} to ${{ inputs.environment }} by @${{ github.actor }}
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       branch:
@@ -12,17 +14,17 @@ on:
         required: true
         type: choice
         options:
-          - "dev"
-          - "ops"
-          - "prod"
+          - 'dev'
+          - 'ops'
+          - 'prod'
       scope:
         description: Cloud will publish scoped only to Grafana Cloud, On Prem will publish with Universal scope. Please use Cloud unless emergency fix needed for On Prem customer.
         required: true
         type: choice
-        default: "cloud (recommended)"
+        default: 'cloud (recommended)'
         options:
-          - "cloud (recommended)"
-          - "on-prem (for emergencies fix to On Prem customers)"
+          - 'cloud (recommended)'
+          - 'on-prem (for emergencies fix to On Prem customers)'
       docs-only:
         description: Only publish docs, do not publish the plugin
         default: false
@@ -31,9 +33,9 @@ on:
 permissions: {}
 
 jobs:
-  cd:
-    name: CD
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v12.1.1
+  publish:
+    name: Publish
+    uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-publish.yml@main # zizmor: ignore[unpinned-uses]
     permissions:
       contents: write
       id-token: write
@@ -41,10 +43,11 @@ jobs:
       pull-requests: read
     with:
       golangci-lint-version: '2.15.0'
+      # On a release event the dispatch inputs are empty, and the shared docs job reads github.event.release.
       branch: ${{ github.event.inputs.branch }}
       # prod targets all environments by default; ops does not target dev by default
       environment: ${{ github.event.inputs.environment == 'ops' && 'dev,ops' || github.event.inputs.environment }}
-      docs-only: ${{ fromJSON(github.event.inputs.docs-only) }}
-      scopes: ${{ github.event.inputs.scope == 'cloud (recommended)' && 'grafana_cloud' || github.event.inputs.scope == 'on-prem (for emergencies fix to On Prem customers)' && 'universal' }}
-      run-playwright: false
-      github-draft-release: false
+      scopes: ${{ github.event.inputs.scope == 'cloud (recommended)' && 'grafana_cloud' || 'universal' }}
+      # fromJSON('') fails on a release event, where the input is empty.
+      docs-only: ${{ github.event.inputs.docs-only == 'true' }}
+    secrets: inherit
