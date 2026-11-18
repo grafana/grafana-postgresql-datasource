@@ -21,7 +21,7 @@ import (
 	"github.com/grafana/grafana-postgresql-datasource/pkg/postgresql/sqleng"
 )
 
-func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit int64, dsInfo sqleng.DataSourceInfo, cnnstr string, logger log.Logger, settings backend.DataSourceInstanceSettings) (*pgxpool.Pool, *sqleng.DataSourceHandler, error) {
+func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit int64, responseLimitBytes int64, dsInfo sqleng.DataSourceInfo, cnnstr string, logger log.Logger, settings backend.DataSourceInstanceSettings) (*pgxpool.Pool, *sqleng.DataSourceHandler, error) {
 	pgxConf, err := pgxpool.ParseConfig(cnnstr)
 	if err != nil {
 		logger.Error("postgres config creation failed", "error", err)
@@ -51,9 +51,10 @@ func newPostgres(ctx context.Context, userFacingDefaultError string, rowLimit in
 	}
 
 	config := sqleng.DataPluginConfiguration{
-		DSInfo:            dsInfo,
-		MetricColumnTypes: []string{"unknown", "text", "varchar", "char", "bpchar"},
-		RowLimit:          rowLimit,
+		DSInfo:             dsInfo,
+		MetricColumnTypes:  []string{"unknown", "text", "varchar", "char", "bpchar"},
+		RowLimit:           rowLimit,
+		ResponseLimitBytes: responseLimitBytes,
 	}
 
 	queryResultTransformer := postgresQueryResultTransformer{}
@@ -132,7 +133,7 @@ func NewInstanceSettings(logger log.Logger) datasource.InstanceFactoryFunc {
 		if err != nil {
 			return "", err
 		}
-		_, handler, err := newPostgres(ctx, userFacingDefaultError, sqlCfg.RowLimit, dsInfo, cnnstr, pgxlogger, settings)
+		_, handler, err := newPostgres(ctx, userFacingDefaultError, sqlCfg.RowLimit, jsonData.ResponseLimitBytes, dsInfo, cnnstr, pgxlogger, settings)
 		if err != nil {
 			pgxlogger.Error("Failed connecting to Postgres", "err", err)
 			return nil, err
