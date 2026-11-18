@@ -42,6 +42,10 @@ services:
         condition: service_completed_successfully
       microsocks:
         condition: service_started
+    configs:
+      # Run this build in place of the core plugin with the same ID.
+      - source: grafana_custom_ini
+        target: /etc/grafana/grafana.ini
     environment:
       # Grafana 13 enabled splashScreen by default; it renders as an overlay that
       # blocks all Playwright interactions. Suppress it unconditionally.
@@ -56,3 +60,9 @@ services:
       GF_SECURE_SOCKS_DATASOURCE_PROXY_ENABLED: "true"
       GF_SECURE_SOCKS_DATASOURCE_PROXY_PROXY_ADDRESS: microsocks:1080
       GF_SECURE_SOCKS_DATASOURCE_PROXY_ALLOW_INSECURE: "true"
+
+configs:
+  grafana_custom_ini:
+    content: |
+      [plugin.grafana-postgresql-datasource]
+      as_external = true
