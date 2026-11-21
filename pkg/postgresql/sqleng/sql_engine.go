@@ -349,11 +349,13 @@ func (e *DataSourceHandler) processFrame(frame *data.Frame, qm *dataQueryModel, 
 	// This assures 1) our visualization doesn't display unwanted empty fields, and also that 2)
 	// additionally-needed frame data stays intact and is correctly passed to our visulization.
 	if frame.Rows() == 0 {
+		observeResponseCells(0)
 		frame.Fields = []*data.Field{}
 		queryResult.dataResponse.Frames = data.Frames{frame}
 		ch <- queryResult
 		return
 	}
+	observed := false
 
 	if err := convertSQLTimeColumnsToEpochMS(frame, qm); err != nil {
 		e.handleQueryError("converting time columns failed", err, qm.InterpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
@@ -388,10 +390,23 @@ func (e *DataSourceHandler) processFrame(frame *data.Frame, qm *dataQueryModel, 
 
 		tsSchema := frame.TimeSeriesSchema()
 		if tsSchema.Type == data.TimeSeriesTypeLong {
+			// Observe before the conversion, because a conversion that exhausts memory never returns.
+			if rows, fields, ok := wideShape(frame, tsSchema); ok {
+				cells := rows * fields
+				observeResponseCells(cells)
+				observed = true
+				if cells >= largeLongToWideCells {
+					logger.Warn("Large long-to-wide conversion", "refId", queryResult.refID, "rows", rows, "fields", fields, "cells", cells)
+				}
+			}
 			var err error
 			originalData := frame
-			frame, err = data.LongToWide(frame, qm.FillMissing)
+			frame, err = data.LongToWideWithLimit(frame, qm.FillMissing, longToWideCellLimit())
 			if err != nil {
+				if errors.Is(err, data.ErrorWideFrameTooLarge) {
+					longToWideRejections.WithLabelValues(pluginType).Inc()
+					err = fmt.Errorf("%w (set %s to change the limit)", err, envLongToWideCellLimit)
+				}
 				e.handleQueryError("failed to convert long to wide series when converting from dataframe", err, qm.InterpolatedQuery, backend.ErrorSourceDownstream, ch, queryResult)
 				return
 			}
@@ -416,6 +431,9 @@ func (e *DataSourceHandler) processFrame(frame *data.Frame, qm *dataQueryModel, 
 		}
 	}
 
+	if !observed {
+		observeResponseCells(int64(frame.Rows()) * int64(len(frame.Fields)))
+	}
 	queryResult.dataResponse.Frames = data.Frames{frame}
 	ch <- queryResult
 }
