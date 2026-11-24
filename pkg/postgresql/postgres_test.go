@@ -137,6 +137,24 @@ func TestIntegrationGenerateConnectionString(t *testing.T) {
 			tlsSettings: tlsSettings{Mode: "verify-full"},
 			expConnStr:  "user='user' host='host' dbname='database' sslmode='verify-full'",
 		},
+		{
+			desc:        "Direct TLS negotiation",
+			host:        "host",
+			user:        "user",
+			password:    "password",
+			database:    "database",
+			tlsSettings: tlsSettings{Mode: "require", Negotiation: "direct"},
+			expConnStr:  "user='user' host='host' dbname='database' password='password' sslmode='require' sslnegotiation='direct'",
+		},
+		{
+			desc:        "Postgres TLS negotiation",
+			host:        "host",
+			user:        "user",
+			password:    "password",
+			database:    "database",
+			tlsSettings: tlsSettings{Mode: "require", Negotiation: "postgres"},
+			expConnStr:  "user='user' host='host' dbname='database' password='password' sslmode='require'",
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {

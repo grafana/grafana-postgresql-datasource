@@ -7,6 +7,11 @@ export enum PostgresTLSModes {
   verifyFull = 'verify-full',
 }
 
+export enum PostgresTLSNegotiation {
+  postgres = 'postgres',
+  direct = 'direct',
+}
+
 export enum PostgresTLSMethods {
   filePath = 'file-path',
   fileContent = 'file-content',
@@ -14,6 +19,7 @@ export enum PostgresTLSMethods {
 export interface PostgresOptions extends SQLOptions {
   tlsConfigurationMethod?: PostgresTLSMethods;
   sslmode?: PostgresTLSModes;
+  sslNegotiation?: PostgresTLSNegotiation;
   sslRootCertFile?: string;
   sslCertFile?: string;
   sslKeyFile?: string;
