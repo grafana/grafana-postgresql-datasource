@@ -1,0 +1,225 @@
+{
+  "examples": {
+    "": {
+      "summary": "PostgreSQL over TCP",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslmode": "disable"
+          },
+          "title": "PostgreSQL",
+          "url": "localhost:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "allowTLS": {
+      "summary": "Try plaintext first and allow a TLS fallback",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslmode": "allow"
+          },
+          "title": "PostgreSQL",
+          "url": "db.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "clientCertificateFiles": {
+      "summary": "Verify the server name and authenticate with certificate files",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslCertFile": "/etc/grafana/certs/client.crt",
+            "sslKeyFile": "/etc/grafana/certs/client.key",
+            "sslRootCertFile": "/etc/grafana/certs/root.crt",
+            "sslmode": "verify-full",
+            "tlsConfigurationMethod": "file-path"
+          },
+          "title": "PostgreSQL",
+          "url": "db.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "directTLS": {
+      "summary": "Direct TLS with client certificate files through an SNI proxy",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslCertFile": "/etc/grafana/certs/client.crt",
+            "sslKeyFile": "/etc/grafana/certs/client.key",
+            "sslNegotiation": "direct",
+            "sslRootCertFile": "/etc/grafana/certs/root.crt",
+            "sslmode": "verify-full",
+            "tlsConfigurationMethod": "file-path"
+          },
+          "title": "PostgreSQL",
+          "url": "sni-proxy:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "preferTLS": {
+      "summary": "Try TLS first and allow a plaintext fallback",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslmode": "prefer"
+          },
+          "title": "PostgreSQL",
+          "url": "db.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "privateCA": {
+      "summary": "Verify the server using an inline CA certificate",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          },
+          "tlsCACert": {
+            "create": "\u003cCA_CERTIFICATE_PEM\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslmode": "verify-ca",
+            "tlsConfigurationMethod": "file-content"
+          },
+          "title": "PostgreSQL",
+          "url": "db.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "privateNetwork": {
+      "summary": "Private Data Source Connect with proxy credentials",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          },
+          "secureSocksProxyPassword": {
+            "create": "\u003cPROXY_PASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "enableSecureSocksProxy": true,
+            "secureSocksProxyUsername": "\u003cPROXY_USERNAME\u003e",
+            "sslmode": "require"
+          },
+          "title": "PostgreSQL",
+          "url": "db.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "timescale": {
+      "summary": "TimescaleDB over TLS",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cPASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "jsonData": {
+            "database": "metrics",
+            "postgresVersion": 1000,
+            "sslmode": "require",
+            "timescaledb": true
+          },
+          "title": "PostgreSQL",
+          "url": "timescale.example.com:5432",
+          "user": "grafana"
+        }
+      }
+    },
+    "unixSocket": {
+      "summary": "PostgreSQL peer authentication over a Unix socket",
+      "value": {
+        "apiVersion": "grafana-postgresql-datasource.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "postgresql"
+        },
+        "spec": {
+          "jsonData": {
+            "database": "grafana",
+            "sslmode": "disable"
+          },
+          "title": "PostgreSQL",
+          "url": "/var/run/postgresql",
+          "user": "grafana"
+        }
+      }
+    }
+  }
+}
