@@ -1,0 +1,154 @@
+{
+  "spec": {
+    "type": "object",
+    "required": [
+      "url",
+      "user"
+    ],
+    "properties": {
+      "jsonData": {
+        "type": "object",
+        "required": [
+          "database"
+        ],
+        "properties": {
+          "connMaxLifetime": {
+            "description": "Maximum age of a pooled connection in whole seconds. Omit to use the Grafana SQL setting. Set to 0 to disable age-based expiry.",
+            "type": "number"
+          },
+          "database": {
+            "description": "PostgreSQL database to query. Use jsonData.database in new configurations. The plugin also reads the legacy top-level database if jsonData.database is empty.",
+            "type": "string"
+          },
+          "enableSecureSocksProxy": {
+            "description": "Route PostgreSQL traffic through Private Data Source Connect (PDC). Requires a secure SOCKS proxy configured in Grafana.",
+            "type": "boolean",
+            "default": false
+          },
+          "keepAlive": {
+            "description": "TCP keep-alive interval in whole seconds. Zero uses the default interval of the Go network dialer. A negative value disables keep-alive probes.",
+            "type": "number",
+            "default": 30,
+            "x-dsconfig-depends-on": "sqleng_settings.enableSecureSocksProxy == true"
+          },
+          "maxOpenConns": {
+            "description": "Maximum open connections, as a whole number. Omit to use the Grafana SQL setting. A nonpositive value uses the driver default, the greater of 4 and the number of CPUs.",
+            "type": "number",
+            "maximum": 2147483647
+          },
+          "postgresVersion": {
+            "description": "Server version code, such as 906 for 9.6 or 1700 for 17. The recorded version is informational and does not change how the plugin builds or runs queries. The editor displays 9.3 when unset and offers 9.0 through 9.6, 10 through 15+, and any detected version. Detection runs only for an editable data source with no version set, a host, database, user, and a saved or entered password. It also requires TLS to be disabled or all three file paths to be set (CA certificate, client certificate, and client key).",
+            "type": "number",
+            "minimum": 1
+          },
+          "responseLimitBytes": {
+            "description": "Maximum size of one query result in whole bytes. Grafana returns a partial result with a warning when the limit is reached. Set to 0 or omit the field to disable the limit.",
+            "type": "number",
+            "default": 0,
+            "minimum": 0
+          },
+          "secureSocksProxyUsername": {
+            "description": "In Grafana Cloud, use the PDC network ID selected for this connection. For a self-managed SOCKS proxy, this is the proxy username and defaults to the data source UID when omitted.",
+            "type": "string",
+            "x-dsconfig-depends-on": "sqleng_settings.enableSecureSocksProxy == true"
+          },
+          "sslCertFile": {
+            "description": "Path on the Grafana server to the client certificate. Provide sslKeyFile with it for client certificate authentication.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_sslmode != 'disable' \u0026\u0026 jsonData_tlsConfigurationMethod != 'file-content'",
+            "x-dsconfig-required-when": "jsonData_sslmode != 'disable' \u0026\u0026 jsonData_tlsConfigurationMethod != 'file-content' \u0026\u0026 jsonData_sslKeyFile != null \u0026\u0026 jsonData_sslKeyFile != ''"
+          },
+          "sslKeyFile": {
+            "description": "Path on the Grafana server to the client private key for sslCertFile.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_sslmode != 'disable' \u0026\u0026 jsonData_tlsConfigurationMethod != 'file-content'",
+            "x-dsconfig-required-when": "jsonData_sslmode != 'disable' \u0026\u0026 jsonData_tlsConfigurationMethod != 'file-content' \u0026\u0026 jsonData_sslCertFile != null \u0026\u0026 jsonData_sslCertFile != ''"
+          },
+          "sslNegotiation": {
+            "description": "With postgres, the client requests TLS before the handshake. With direct, it starts TLS immediately for PostgreSQL 17 or later or a compatible TLS proxy.",
+            "type": "string",
+            "default": "postgres",
+            "enum": [
+              "postgres",
+              "direct"
+            ],
+            "x-dsconfig-depends-on": "jsonData_sslmode != 'disable'"
+          },
+          "sslRootCertFile": {
+            "description": "Path on the Grafana server to a PEM CA certificate used to verify the database server. A supplied CA also enables chain verification in require mode.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_sslmode != 'disable' \u0026\u0026 jsonData_tlsConfigurationMethod != 'file-content'"
+          },
+          "sslmode": {
+            "description": "TLS policy for TCP connections. The editor displays require when this field is empty. Set require explicitly to require encryption. With ordinary PostgreSQL negotiation, an omitted value prefers TLS and permits a plaintext fallback. Provisioning also accepts prefer and allow. A Unix socket uses local transport.",
+            "type": "string",
+            "enum": [
+              "disable",
+              "require",
+              "verify-ca",
+              "verify-full",
+              "prefer",
+              "allow"
+            ]
+          },
+          "timeInterval": {
+            "description": "Minimum interval Grafana uses when calculating a query interval, for example 1m. The SQL frontend defaults to 1m. The backend expands $__interval and $__interval_ms using the interval supplied in each query.",
+            "type": "string"
+          },
+          "timeout": {
+            "description": "Time in whole seconds to establish the SOCKS proxy connection. Set to 0 for no dial timeout.",
+            "type": "number",
+            "default": 30,
+            "minimum": 0,
+            "x-dsconfig-depends-on": "sqleng_settings.enableSecureSocksProxy == true"
+          },
+          "timescaledb": {
+            "description": "Use the TimescaleDB time_bucket function for time-grouping macros. Enable this when the extension is installed in the selected database.",
+            "type": "boolean",
+            "default": false
+          },
+          "tlsConfigurationMethod": {
+            "description": "Use file-path for certificate files readable by Grafana, or file-content for PEM text. With this plugin version, client certificate authentication requires persistent files. A CA certificate can be supplied inline.",
+            "type": "string",
+            "default": "file-path",
+            "enum": [
+              "file-path",
+              "file-content"
+            ],
+            "x-dsconfig-depends-on": "jsonData_sslmode != 'disable'"
+          }
+        }
+      },
+      "url": {
+        "description": "TCP hostname or IP address with an optional port, for example localhost:5432 or [::1]:5432. Use the host directly, without a URL scheme. For a Unix socket, enter the absolute socket directory, for example /var/run/postgresql.",
+        "type": "string"
+      },
+      "user": {
+        "description": "PostgreSQL login role. Set the top-level user for password, certificate, and local peer authentication.",
+        "type": "string"
+      }
+    }
+  },
+  "secureValues": [
+    {
+      "key": "password",
+      "description": "Password for the PostgreSQL login role. Omit it for a server configured for passwordless authentication, such as peer or certificate authentication."
+    },
+    {
+      "key": "tlsClientCert",
+      "description": "PEM client certificate for mutual TLS. In this plugin version, Grafana removes the temporary file before the driver reloads it. Use file-path with sslCertFile and sslKeyFile when the server requests a client certificate."
+    },
+    {
+      "key": "tlsCACert",
+      "description": "PEM CA certificate used to verify the server certificate chain. The editor shows the inline CA for verify-ca and verify-full. Provisioning also accepts it with require, which enables chain verification when a CA is supplied."
+    },
+    {
+      "key": "tlsClientKey",
+      "description": "PEM private key for the client certificate. In this plugin version, the driver reloads the key during client certificate authentication. Use a persistent sslKeyFile together with sslCertFile for that mode."
+    },
+    {
+      "key": "secureSocksProxyPassword",
+      "description": "Password for the SOCKS proxy username. Store it separately from the PostgreSQL password."
+    }
+  ]
+}

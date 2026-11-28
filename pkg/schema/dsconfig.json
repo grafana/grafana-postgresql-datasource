@@ -1,0 +1,502 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/dsconfig/refs/tags/dsconfig/v0.0.13/dsconfig/schema.json",
+  "schemaVersion": "v1",
+  "pluginType": "grafana-postgresql-datasource",
+  "pluginName": "PostgreSQL",
+  "docURL": "https://grafana.com/docs/grafana/latest/datasources/postgres/",
+  "baseFields": [
+    {
+      "from": "sqleng_settings",
+      "exclude": [
+        "sqleng_settings.connectionTimeout",
+        "sqleng_settings.maxOpenConns",
+        "sqleng_settings.maxIdleConns",
+        "sqleng_settings.connMaxLifetime",
+        "sqleng_settings.tlsSkipVerify",
+        "sqleng_settings.tlsConfigurationMethod",
+        "sqleng_settings.sslRootCertFile",
+        "sqleng_settings.sslCertFile",
+        "sqleng_settings.sslKeyFile",
+        "sqleng_settings.servername",
+        "sqleng_settings.tlsCACert",
+        "sqleng_settings.tlsClientCert",
+        "sqleng_settings.tlsClientKey",
+        "sqleng_settings.secureSocksProxyUsername"
+      ],
+      "patch": {
+        "sqleng_settings.url": {
+          "description": "TCP hostname or IP address with an optional port, for example localhost:5432 or [::1]:5432. Use the host directly, without a URL scheme. For a Unix socket, enter the absolute socket directory, for example /var/run/postgresql."
+        },
+        "sqleng_settings.user": {
+          "required": true,
+          "description": "PostgreSQL login role. Set the top-level user for password, certificate, and local peer authentication."
+        },
+        "sqleng_settings.password": {
+          "description": "Password for the PostgreSQL login role. Omit it for a server configured for passwordless authentication, such as peer or certificate authentication."
+        },
+        "sqleng_settings.database": {
+          "required": true,
+          "description": "PostgreSQL database to query. Use jsonData.database in new configurations. The plugin also reads the legacy top-level database if jsonData.database is empty."
+        },
+        "sqleng_settings.timeInterval": {
+          "description": "Minimum interval Grafana uses when calculating a query interval, for example 1m. The SQL frontend defaults to 1m. The backend expands $__interval and $__interval_ms using the interval supplied in each query."
+        },
+        "sqleng_settings.enableSecureSocksProxy": {
+          "defaultValue": false,
+          "description": "Route PostgreSQL traffic through Private Data Source Connect (PDC). Requires a secure SOCKS proxy configured in Grafana."
+        }
+      }
+    }
+  ],
+  "fields": [
+    {
+      "id": "jsonData_sslmode",
+      "key": "sslmode",
+      "label": "TLS/SSL Mode",
+      "description": "TLS policy for TCP connections. The editor displays require when this field is empty. Set require explicitly to require encryption. With ordinary PostgreSQL negotiation, an omitted value prefers TLS and permits a plaintext fallback. Provisioning also accepts prefer and allow. A Unix socket uses local transport.",
+      "valueType": "string",
+      "target": "jsonData",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": [
+            "disable",
+            "require",
+            "verify-ca",
+            "verify-full",
+            "prefer",
+            "allow"
+          ]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          {
+            "label": "disable",
+            "value": "disable"
+          },
+          {
+            "label": "require",
+            "value": "require"
+          },
+          {
+            "label": "verify-ca",
+            "value": "verify-ca"
+          },
+          {
+            "label": "verify-full",
+            "value": "verify-full"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_sslNegotiation",
+      "key": "sslNegotiation",
+      "label": "TLS/SSL Negotiation",
+      "description": "With postgres, the client requests TLS before the handshake. With direct, it starts TLS immediately for PostgreSQL 17 or later or a compatible TLS proxy.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "postgres",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": [
+            "postgres",
+            "direct"
+          ]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          {
+            "label": "postgres",
+            "value": "postgres"
+          },
+          {
+            "label": "direct",
+            "value": "direct"
+          }
+        ]
+      },
+      "dependsOn": "jsonData_sslmode != 'disable'"
+    },
+    {
+      "id": "jsonData_tlsConfigurationMethod",
+      "key": "tlsConfigurationMethod",
+      "label": "TLS/SSL Method",
+      "description": "Use file-path for certificate files readable by Grafana, or file-content for PEM text. With this plugin version, client certificate authentication requires persistent files. A CA certificate can be supplied inline.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "file-path",
+      "dependsOn": "jsonData_sslmode != 'disable'",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": [
+            "file-path",
+            "file-content"
+          ]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          {
+            "label": "File system path",
+            "value": "file-path"
+          },
+          {
+            "label": "Certificate content",
+            "value": "file-content"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_sslRootCertFile",
+      "key": "sslRootCertFile",
+      "label": "TLS/SSL Root Certificate",
+      "description": "Path on the Grafana server to a PEM CA certificate used to verify the database server. A supplied CA also enables chain verification in require mode.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod != 'file-content'",
+      "ui": {
+        "component": "input",
+        "placeholder": "TLS/SSL root cert file"
+      }
+    },
+    {
+      "id": "jsonData_sslCertFile",
+      "key": "sslCertFile",
+      "label": "TLS/SSL Client Certificate",
+      "description": "Path on the Grafana server to the client certificate. Provide sslKeyFile with it for client certificate authentication.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod != 'file-content'",
+      "ui": {
+        "component": "input",
+        "placeholder": "TLS/SSL client cert file"
+      },
+      "requiredWhen": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod != 'file-content' && jsonData_sslKeyFile != null && jsonData_sslKeyFile != ''"
+    },
+    {
+      "id": "jsonData_sslKeyFile",
+      "key": "sslKeyFile",
+      "label": "TLS/SSL Client Key",
+      "description": "Path on the Grafana server to the client private key for sslCertFile.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod != 'file-content'",
+      "ui": {
+        "component": "input",
+        "placeholder": "TLS/SSL client key file"
+      },
+      "requiredWhen": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod != 'file-content' && jsonData_sslCertFile != null && jsonData_sslCertFile != ''"
+    },
+    {
+      "id": "secureJsonData_tlsClientCert",
+      "key": "tlsClientCert",
+      "label": "TLS/SSL Client Certificate",
+      "description": "PEM client certificate for mutual TLS. In this plugin version, Grafana removes the temporary file before the driver reloads it. Use file-path with sslCertFile and sslKeyFile when the server requests a client certificate.",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.clientCert",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod == 'file-content'",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "-----BEGIN CERTIFICATE-----"
+      },
+      "requiredWhen": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod == 'file-content' && secureJsonData_tlsClientKey != null && secureJsonData_tlsClientKey != ''"
+    },
+    {
+      "id": "secureJsonData_tlsCACert",
+      "key": "tlsCACert",
+      "label": "TLS/SSL Root Certificate",
+      "description": "PEM CA certificate used to verify the server certificate chain. The editor shows the inline CA for verify-ca and verify-full. Provisioning also accepts it with require, which enables chain verification when a CA is supplied.",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.caCert",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod == 'file-content' && (jsonData_sslmode == 'verify-ca' || jsonData_sslmode == 'verify-full')",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "-----BEGIN CERTIFICATE-----"
+      }
+    },
+    {
+      "id": "secureJsonData_tlsClientKey",
+      "key": "tlsClientKey",
+      "label": "TLS/SSL Client Key",
+      "description": "PEM private key for the client certificate. In this plugin version, the driver reloads the key during client certificate authentication. Use a persistent sslKeyFile together with sslCertFile for that mode.",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.clientKey",
+      "dependsOn": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod == 'file-content'",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "-----BEGIN RSA PRIVATE KEY-----"
+      },
+      "requiredWhen": "jsonData_sslmode != 'disable' && jsonData_tlsConfigurationMethod == 'file-content' && secureJsonData_tlsClientCert != null && secureJsonData_tlsClientCert != ''"
+    },
+    {
+      "id": "jsonData_postgresVersion",
+      "key": "postgresVersion",
+      "label": "Version",
+      "description": "Server version code, such as 906 for 9.6 or 1700 for 17. The recorded version is informational and does not change how the plugin builds or runs queries. The editor displays 9.3 when unset and offers 9.0 through 9.6, 10 through 15+, and any detected version. Detection runs only for an editable data source with no version set, a host, database, user, and a saved or entered password. It also requires TLS to be disabled or all three file paths to be set (CA certificate, client certificate, and client key).",
+      "valueType": "number",
+      "target": "jsonData",
+      "ui": {
+        "component": "select"
+      },
+      "overrides": [
+        {
+          "when": "true",
+          "options": [
+            {
+              "label": "9.0",
+              "value": 900
+            },
+            {
+              "label": "9.1",
+              "value": 901
+            },
+            {
+              "label": "9.2",
+              "value": 902
+            },
+            {
+              "label": "9.3",
+              "value": 903
+            },
+            {
+              "label": "9.4",
+              "value": 904
+            },
+            {
+              "label": "9.5",
+              "value": 905
+            },
+            {
+              "label": "9.6",
+              "value": 906
+            },
+            {
+              "label": "10",
+              "value": 1000
+            },
+            {
+              "label": "11",
+              "value": 1100
+            },
+            {
+              "label": "12",
+              "value": 1200
+            },
+            {
+              "label": "13",
+              "value": 1300
+            },
+            {
+              "label": "14",
+              "value": 1400
+            },
+            {
+              "label": "15+",
+              "value": 1500
+            }
+          ]
+        }
+      ],
+      "validations": [
+        {
+          "type": "range",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "id": "jsonData_timescaledb",
+      "key": "timescaledb",
+      "label": "TimescaleDB",
+      "description": "Use the TimescaleDB time_bucket function for time-grouping macros. Enable this when the extension is installed in the selected database.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_maxOpenConns",
+      "key": "maxOpenConns",
+      "label": "Max open",
+      "description": "Maximum open connections, as a whole number. Omit to use the Grafana SQL setting. A nonpositive value uses the driver default, the greater of 4 and the number of CPUs.",
+      "valueType": "number",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      },
+      "validations": [
+        {
+          "type": "range",
+          "max": 2147483647
+        }
+      ]
+    },
+    {
+      "id": "jsonData_connMaxLifetime",
+      "key": "connMaxLifetime",
+      "label": "Max lifetime",
+      "description": "Maximum age of a pooled connection in whole seconds. Omit to use the Grafana SQL setting. Set to 0 to disable age-based expiry.",
+      "valueType": "number",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_responseLimitBytes",
+      "key": "responseLimitBytes",
+      "label": "Response size limit",
+      "description": "Maximum size of one query result in whole bytes. Grafana returns a partial result with a warning when the limit is reached. Set to 0 or omit the field to disable the limit.",
+      "valueType": "number",
+      "target": "jsonData",
+      "defaultValue": 0,
+      "validations": [
+        {
+          "type": "range",
+          "min": 0
+        }
+      ],
+      "ui": {
+        "component": "input",
+        "placeholder": "0"
+      }
+    },
+    {
+      "id": "jsonData_secureSocksProxyUsername",
+      "key": "secureSocksProxyUsername",
+      "label": "Proxy username",
+      "description": "In Grafana Cloud, use the PDC network ID selected for this connection. For a self-managed SOCKS proxy, this is the proxy username and defaults to the data source UID when omitted.",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "sqleng_settings.enableSecureSocksProxy == true",
+      "tags": [
+        "provisioning"
+      ]
+    },
+    {
+      "id": "secureJsonData_secureSocksProxyPassword",
+      "key": "secureSocksProxyPassword",
+      "label": "Proxy password",
+      "description": "Password for the SOCKS proxy username. Store it separately from the PostgreSQL password.",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "dependsOn": "sqleng_settings.enableSecureSocksProxy == true",
+      "tags": [
+        "provisioning"
+      ]
+    },
+    {
+      "id": "jsonData_timeout",
+      "key": "timeout",
+      "label": "Proxy connection timeout",
+      "description": "Time in whole seconds to establish the SOCKS proxy connection. Set to 0 for no dial timeout.",
+      "valueType": "number",
+      "target": "jsonData",
+      "defaultValue": 30,
+      "dependsOn": "sqleng_settings.enableSecureSocksProxy == true",
+      "tags": [
+        "provisioning"
+      ],
+      "validations": [
+        {
+          "type": "range",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "id": "jsonData_keepAlive",
+      "key": "keepAlive",
+      "label": "Proxy keep-alive interval",
+      "description": "TCP keep-alive interval in whole seconds. Zero uses the default interval of the Go network dialer. A negative value disables keep-alive probes.",
+      "valueType": "number",
+      "target": "jsonData",
+      "defaultValue": 30,
+      "dependsOn": "sqleng_settings.enableSecureSocksProxy == true",
+      "tags": [
+        "provisioning"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "connection",
+      "title": "Connection",
+      "order": 1,
+      "fieldRefs": [
+        "sqleng_settings.url",
+        "sqleng_settings.database"
+      ]
+    },
+    {
+      "id": "authentication",
+      "title": "Authentication",
+      "order": 2,
+      "fieldRefs": [
+        "sqleng_settings.user",
+        "sqleng_settings.password",
+        "jsonData_sslmode",
+        "jsonData_sslNegotiation",
+        "jsonData_tlsConfigurationMethod"
+      ]
+    },
+    {
+      "id": "tls-details",
+      "title": "TLS/SSL Auth Details",
+      "order": 3,
+      "optional": true,
+      "fieldRefs": [
+        "jsonData_sslRootCertFile",
+        "jsonData_sslCertFile",
+        "jsonData_sslKeyFile",
+        "secureJsonData_tlsClientCert",
+        "secureJsonData_tlsCACert",
+        "secureJsonData_tlsClientKey"
+      ]
+    },
+    {
+      "id": "additional-settings",
+      "title": "Additional settings",
+      "order": 4,
+      "optional": true,
+      "fieldRefs": [
+        "jsonData_postgresVersion",
+        "sqleng_settings.timeInterval",
+        "jsonData_timescaledb",
+        "jsonData_maxOpenConns",
+        "jsonData_connMaxLifetime",
+        "jsonData_responseLimitBytes",
+        "sqleng_settings.enableSecureSocksProxy"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "msg": "Use the plugin type grafana-postgresql-datasource for new provisioning. The legacy plugin ID postgres is an alias.",
+      "tags": [
+        "llm",
+        "provisioning"
+      ]
+    }
+  ]
+}

@@ -104,3 +104,22 @@ Title your pull request as a [Conventional Commit](https://www.conventionalcommi
 Do not edit the version in `package.json`, and do not write `CHANGELOG.md` entries by hand. release-please owns both files, and a manual edit puts `package.json` out of step with `.release-please-manifest.json`, which makes the next release pick a wrong version.
 
 To release a specific version, add a `Release-As: X.Y.Z` footer to a commit rather than editing the version.
+
+## Data source configuration schema
+
+Edit `pkg/schema/dsconfig.json` when a PostgreSQL setting, default, or editor choice changes.
+Keep its schema URL at the version of `github.com/grafana/dsconfig/dsconfig` in `go.mod`.
+The conformance test in `pkg/schema/dsconfig_test.go` uses the loader's `sqleng.JsonData` from
+`pkg/postgresql/sqleng/sql_engine.go` and excludes fields unused by PostgreSQL connections and queries.
+Update the test's editor and SDK fields, secure key list, and connection examples when those settings change.
+
+From the repository root, run:
+
+```sh
+go generate ./pkg/schema/...
+go test ./pkg/schema/...
+```
+
+The generator writes `pkg/schema/schema.gen.json`, `pkg/schema/settings.gen.json`, and
+`pkg/schema/settings.examples.gen.json`. The production build (`npm run build`) packages these
+files and the handwritten schema under `dist/schema/`.
